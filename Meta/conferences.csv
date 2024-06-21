@@ -1,0 +1,13 @@
+shorthand name,full name,division name,flair,championship game,conferences games count
+American,American Athletic Conference,,[](#l/aac),True,True
+ACC,Atlantic Coast Conference,,[](#l/acc),True,True
+Big Ten,Big Ten,,[](#l/bigten),True,True
+Big 12,Big 12,,[](#l/big12),True,True
+C-USA,Conference USA,,[](#l/cusa),True,True
+MAC,Mid-American Conference,,[](#l/mac),True,True
+MWC,Mountain West,,[](#l/mwc),True,True
+Pac-12,Pac-12,,[](#l/pac12),False,True
+SEC,Southeastern Conference,,[](#l/sec),True,True
+Sun Belt,Sun Belt,East,[](#l/sunbelt),True,True
+Sun Belt,Sun Belt,West,[](#l/sunbelt),True,True
+Independents,Independents,,[](#l/indep),False,False
