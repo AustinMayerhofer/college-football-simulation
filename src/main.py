@@ -107,8 +107,8 @@ def read_teams_file():
         ]
         df[columns_to_fill_empty_string] = df[columns_to_fill_empty_string].fillna('')
 
-        # Fill NaN values in initialRankingPoints with 0.0
-        df['initialRankingPoints'] = df['initialRankingPoints'].fillna(0.0)
+        # Fill NaN values in initialRankingPoints with -999
+        df['initialRankingPoints'] = df['initialRankingPoints'].fillna(-999)
 
         # Validate data types
         type_validations = {
@@ -135,8 +135,11 @@ def read_teams_file():
         if df.isnull().values.any():
             raise ValueError("DataFrame contains NaN values, which are not allowed")
 
-        if df['id'].duplicated().any():
-            raise ValueError("Duplicate team names found")
+        # Check for duplicate team IDs
+        duplicate_ids = df[df.duplicated(['id'], keep=False)]['id']
+        if not duplicate_ids.empty:
+            duplicate_teams = df[df['id'].isin(duplicate_ids)][['id', 'displayName']]
+            raise ValueError(f"Duplicate team ids found: {duplicate_teams.to_dict(orient='records')}")
 
         # If all checks pass, return the DataFrame
         return df
