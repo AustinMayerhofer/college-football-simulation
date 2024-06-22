@@ -100,9 +100,15 @@ def read_teams_file():
         # Rename the columns
         df.rename(columns=expected_columns, inplace=True)
 
-        # Fill NaN values in specific columns with empty strings for consistency
-        columns_to_fill = ['conferenceDivision', 'punterName', 'kickReturnerName', 'puntReturnerName']
-        df[columns_to_fill] = df[columns_to_fill].fillna('')
+        # Fill NaN values in specific columns with empty strings or default values for consistency
+        columns_to_fill_empty_string = [
+            'flair', 'conferenceDivision', 'record', 'headCoachName',
+            'punterName', 'kickReturnerName', 'puntReturnerName'
+        ]
+        df[columns_to_fill_empty_string] = df[columns_to_fill_empty_string].fillna('')
+
+        # Fill NaN values in initialRankingPoints with 0.0
+        df['initialRankingPoints'] = df['initialRankingPoints'].fillna(0.0)
 
         # Validate data types
         type_validations = {
