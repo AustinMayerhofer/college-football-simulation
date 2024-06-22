@@ -1,91 +1,145 @@
 import pandas as pd
 import os
 
-def read_conferences_file(filepath='Meta/conferences.csv'):
-    """
-    Reads the conferences.csv file into a dataframe and returns it.
+def read_conferences_file():
+    file_path = 'Meta/conferences.csv'
+    
+    # Define the expected columns in the original file and their new names
+    expected_columns = {
+        'shorthand name': 'id',
+        'full name': 'fullName',
+        'division name': 'divisions',
+        'flair': 'flair',  # Assuming flair is required and should be validated
+        'championship game': 'hasConferenceChampGame',
+        'conference games count': 'doConferenceGamesCount'
+    }
+    
+    try:
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(file_path)
+        
+        # Check if the DataFrame has the expected columns
+        if list(df.columns) != list(expected_columns.keys()):
+            raise ValueError(f"Expected columns {list(expected_columns.keys())}, but got {list(df.columns)}")
 
-    Parameters:
-        filepath (str or Path): The path to the conferences.csv file.
+        # Rename the columns
+        df.rename(columns=expected_columns, inplace=True)
 
-    Returns:
-        pd.DataFrame: The dataframe containing the conferences data, or an empty dataframe if an error occurs.
-    """
-    filepath = str(filepath)  # Ensure the filepath is a string
+        # Convert 'divisions' column to a list
+        df['divisions'] = df['divisions'].apply(lambda x: [x] if pd.notna(x) else [])
 
-    # Check if the file exists
-    if not os.path.exists(filepath):
-        print(f"Error: The file '{filepath}' does not exist.")
-        return pd.DataFrame()
+        # Group by the other columns and aggregate divisions
+        df = df.groupby(['id', 'fullName', 'flair', 'hasConferenceChampGame', 'doConferenceGamesCount'], as_index=False).agg({
+            'divisions': lambda x: [i for sublist in x for i in sublist]  # Flatten list of lists
+        })
 
-    # Check if the file is a CSV file
-    if not filepath.endswith('.csv'):
-        print(f"Error: The file '{filepath}' is not a CSV file.")
-        return pd.DataFrame()
+        # Validate data types
+        type_validations = {
+            'id': str,
+            'fullName': str,
+            'divisions': list,
+            'flair': str,
+            'hasConferenceChampGame': bool,
+            'doConferenceGamesCount': bool
+        }
+
+        for column, expected_type in type_validations.items():
+            if not df[column].apply(lambda x: isinstance(x, expected_type)).all():
+                raise TypeError(f"Column '{column}' does not match expected type {expected_type.__name__}")
+
+        # Validate specific content rules
+        if df.isnull().values.any():
+            raise ValueError("DataFrame contains NaN values, which are not allowed")
+
+        if df['id'].duplicated().any():
+            raise ValueError("Duplicate shorthand names found")
+
+        if df['fullName'].duplicated().any():
+            raise ValueError("Duplicate full names found")
+
+        # If all checks pass, return the DataFrame
+        return df
+    
+    except FileNotFoundError:
+        print(f"Error: The file at path {file_path} was not found.")
+    except pd.errors.EmptyDataError:
+        print("Error: The file is empty.")
+    except pd.errors.ParserError:
+        print("Error: The file contains parsing errors.")
+    except Exception as e:
+        print(f"Error: {e}")
+
+def read_teams_file():
+    file_path = 'Meta/teams.csv'
+    
+    # Define the expected columns in the original file and their expected types
+    expected_columns = {
+        'official name': 'id',
+        'display name': 'displayName',
+        'Whatifsports name': 'whatifsportsName',
+        'flair': 'flair',
+        'conference': 'conferenceID',
+        'conference division': 'conferenceDivision',
+        'year': 'year',
+        'record': 'record',
+        'initial ranking points': 'initialRankingPoints',
+        'head coach': 'headCoachName',
+        'punter': 'punterName',
+        'kick returner': 'kickReturnerName',
+        'punt returner': 'puntReturnerName'
+    }
 
     try:
-        # Attempt to read the CSV file into a dataframe
-        conferences_df = pd.read_csv(filepath)
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(file_path)
 
-        # Perform basic type checking on the dataframe
-        expected_columns = ["shorthand name", "full name", "division name", "flair", "championship game", "conferences games count"]
-        if not all(column in conferences_df.columns for column in expected_columns):
-            print("Error: The conferences file does not contain the expected columns.")
-            return pd.DataFrame()
+        # Check if the DataFrame has the expected columns
+        if list(df.columns) != list(expected_columns.keys()):
+            raise ValueError(f"Expected columns {list(expected_columns.keys())}, but got {list(df.columns)}")
 
-        # Simplified type checks: Ensure that the dataframe is not empty
-        if conferences_df.empty:
-            print("Error: The dataframe is empty.")
-            return pd.DataFrame()
+        # Rename the columns
+        df.rename(columns=expected_columns, inplace=True)
 
-        return conferences_df
+        # Fill NaN values in specific columns with empty strings for consistency
+        columns_to_fill = ['conferenceDivision', 'punterName', 'kickReturnerName', 'puntReturnerName']
+        df[columns_to_fill] = df[columns_to_fill].fillna('')
+
+        # Validate data types
+        type_validations = {
+            'id': str,
+            'displayName': str,
+            'whatifsportsName': str,
+            'flair': str,
+            'conferenceID': str,
+            'conferenceDivision': str,
+            'year': int,
+            'record': str,
+            'initialRankingPoints': float,
+            'headCoachName': str,
+            'punterName': str,
+            'kickReturnerName': str,
+            'puntReturnerName': str
+        }
+
+        for column, expected_type in type_validations.items():
+            if not df[column].apply(lambda x: isinstance(x, expected_type)).all():
+                raise TypeError(f"Column '{column}' does not match expected type {expected_type.__name__}")
+
+        # Validate specific content rules
+        if df.isnull().values.any():
+            raise ValueError("DataFrame contains NaN values, which are not allowed")
+
+        if df['id'].duplicated().any():
+            raise ValueError("Duplicate team names found")
+
+        # If all checks pass, return the DataFrame
+        return df
+
+    except FileNotFoundError:
+        print(f"Error: The file at path {file_path} was not found.")
+    except pd.errors.EmptyDataError:
+        print("Error: The file is empty.")
+    except pd.errors.ParserError:
+        print("Error: The file contains parsing errors.")
     except Exception as e:
-        print(f"An error occurred while reading the conferences file: {e}")
-        return pd.DataFrame()  # Return an empty dataframe in case of error
-
-
-
-def read_teams_file(filepath='Meta/teams.csv'):
-    """
-    Reads the teams.csv file into a dataframe and returns it.
-
-    Parameters:
-        filepath (str or Path): The path to the teams.csv file.
-
-    Returns:
-        pd.DataFrame: The dataframe containing the teams data, or an empty dataframe if an error occurs.
-    """
-    filepath = str(filepath)  # Ensure the filepath is a string
-
-    # Check if the file exists
-    if not os.path.exists(filepath):
-        print(f"Error: The file '{filepath}' does not exist.")
-        return pd.DataFrame()
-
-    # Check if the file is a CSV file
-    if not filepath.endswith('.csv'):
-        print(f"Error: The file '{filepath}' is not a CSV file.")
-        return pd.DataFrame()
-
-    try:
-        # Attempt to read the CSV file into a dataframe
-        teams_df = pd.read_csv(filepath)
-
-        # Perform basic type checking on the dataframe
-        expected_columns = ["official name", "display name", "Whatifsports name", "flair", 
-                            "conference", "conference division", "year", "record", 
-                            "initial ranking points", "head coach", "punter", 
-                            "kick returner", "punt returner"]
-        if not all(column in teams_df.columns for column in expected_columns):
-            print("Error: The teams file does not contain the expected columns.")
-            return pd.DataFrame()
-
-        # Simplified type checks: Ensure that the dataframe is not empty
-        if teams_df.empty:
-            print("Error: The dataframe is empty.")
-            return pd.DataFrame()
-
-        return teams_df
-    except Exception as e:
-        print(f"An error occurred while reading the teams file: {e}")
-        return pd.DataFrame()  # Return an empty dataframe in case of error
+        print(f"Error: {e}")
