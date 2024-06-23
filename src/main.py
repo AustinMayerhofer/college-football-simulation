@@ -163,6 +163,18 @@ def parse_whatifsports_box_score(content):
     # create a dictionary to store the box score data
     game_data = {}
 
+    # assert that content has a fully filled out box score, otherwise I need to add in those sections by hand
+    if len(re.findall(r'^Rushing$', content, re.MULTILINE)) != 2:
+        raise ValueError("Content does not contain 2 lines starting with 'Rushing'")
+    if len(re.findall(r'^Receiving$', content, re.MULTILINE)) != 2:
+        raise ValueError("Content does not contain 2 lines starting with 'Receiving'")
+    if len(re.findall(r'^Passing$', content, re.MULTILINE)) != 2:
+        raise ValueError("Content does not contain 2 lines starting with 'Passing'")
+    if len(re.findall(r'^Defensive$', content, re.MULTILINE)) != 2:
+        raise ValueError("Content does not contain 2 lines starting with 'Defensive'")
+    if len(re.findall(r'^Field Goals$', content, re.MULTILINE)) != 2:
+        raise ValueError("Content does not contain 2 lines starting with 'Kicking'")
+
     # first line has {away team year} {away team name} at {home team year} {home team name}, store the team names
     # get first line of content
     first_line = content.split('\n')[0]
@@ -327,6 +339,163 @@ def parse_whatifsports_box_score(content):
     time_of_possession = time_of_possession_line.group().split()
     game_data['awayTimeOfPossession'] = datetime.strptime(time_of_possession[3], '%M:%S')
     game_data['homeTimeOfPossession'] = datetime.strptime(time_of_possession[4], '%M:%S')
+
+    # The first subsection will be "Rushing" and the away team stats will come first. The next row is the " 	Att	Yds	20+	L	TD" and this is just the header telling you how to interpret the stats, we can ignore it. The next lines are formatted as follows:
+    # {team year abbreviated} {player name} {rush attempts} {rush yards} {20 plus rush yard attempts} {longest rush} {rushing touchdowns}
+    # and keep in mind that there might be multiple players, we keep reading these player rushing stats until we reach the next section "Rushing" which then will have the home team player rushing stats following it.
+    # get the lines from the first line that starts with "Rushing" to the next line that starts with "Rushing"
+    rushing_stats_lines = re.search(r'^Rushing(.*)Rushing', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerAwayRushingStats', [])
+    # iterate over each line in rushing_stats_lines except for the first 2 and last 2 lines
+    for line in rushing_stats_lines.split('\n')[2:-2]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player rushing stats
+        player_rushing_stats = {
+            'playerName': ' '.join(stats[1:-5]),
+            'carries': int(stats[-5]),
+            'rushingYards': int(stats[-4]),
+            '20PlusYardCarries': int(stats[-3]),
+            'longestRush': int(stats[-2]),
+            'rushingTouchdowns': int(stats[-1])
+        }
+        # store the player rushing stats in the game_data dictionary
+        game_data.get('playerAwayRushingStats').append(player_rushing_stats)
+
+    # Home team player rushing stats will follow the away team player rushing stats
+    rushing_stats_lines = re.search(r'^Rushing.*Rushing(.*)^Receiving.*Receiving', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerHomeRushingStats', [])
+    # iterate over each line in rushing_stats_lines except for the first and last lines
+    for line in rushing_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player rushing stats
+        player_rushing_stats = {
+            'playerName': ' '.join(stats[1:-5]),
+            'carries': int(stats[-5]),
+            'rushingYards': int(stats[-4]),
+            '20PlusYardCarries': int(stats[-3]),
+            'longestRush': int(stats[-2]),
+            'rushingTouchdowns': int(stats[-1])
+        }
+        # store the player rushing stats in the game_data dictionary
+        game_data.get('playerHomeRushingStats').append(player_rushing_stats)
+    
+    # "Receiving" eventually comes up, with the away team first again. Player stats follow the format:
+    # {team year abbreviated} {player name} {receptions} {receiving yards} {catches of 20 plus yards} {catches of 40 plus yards} {longest catch} {touchdown catches}
+    # get the lines from the first line that starts with "Receiving" to the next line that starts with "Receiving"
+    receiving_stats_lines = re.search(r'^Receiving(.*)Receiving', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerAwayReceivingStats', [])
+    # iterate over each line in receiving_stats_lines except for the first 2 lines and last line
+    for line in receiving_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player receiving stats
+        player_receiving_stats = {
+            'playerName': ' '.join(stats[1:-6]),
+            'receptions': int(stats[-6]),
+            'receivingYards': int(stats[-5]),
+            '20PlusYardReceptions': int(stats[-4]),
+            '40PlusYardReceptions': int(stats[-3]),
+            'longestReception': int(stats[-2]),
+            'receivingTouchdowns': int(stats[-1])
+        }
+        # store the player receiving stats in the game_data dictionary
+        game_data.get('playerAwayReceivingStats').append(player_receiving_stats)
+    
+    # Home team player receiving stats will follow the away team player receiving stats
+    receiving_stats_lines = re.search(r'^Receiving.*Receiving(.*)^Passing.*Passing', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerHomeReceivingStats', [])
+    # iterate over each line in receiving_stats_lines except for the first and last lines
+    for line in receiving_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player receiving stats
+        player_receiving_stats = {
+            'playerName': ' '.join(stats[1:-6]),
+            'receptions': int(stats[-6]),
+            'receivingYards': int(stats[-5]),
+            '20PlusYardReceptions': int(stats[-4]),
+            '40PlusYardReceptions': int(stats[-3]),
+            'longestReception': int(stats[-2]),
+            'receivingTouchdowns': int(stats[-1])
+        }
+        # store the player receiving stats in the game_data dictionary
+        game_data.get('playerHomeReceivingStats').append(player_receiving_stats)
+    
+    # "Passing" comes up after, with the following format:
+    # {team year abbreviated} {player name} {pass completions} {pass attempts} {pass yards} {pass touchdowns} {interceptions thrown}
+    # get the lines from the first line that starts with "Passing" to the next line that starts with "Passing"
+    passing_stats_lines = re.search(r'^Passing$(.*)Passing', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerAwayPassingStats', [])
+    # iterate over each line in passing_stats_lines except for the first 2 lines and last line
+    for line in passing_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player passing stats
+        player_passing_stats = {
+            'playerName': ' '.join(stats[1:-5]),
+            'passCompletions': int(stats[-5]),
+            'passAttempts': int(stats[-4]),
+            'passingYards': int(stats[-3]),
+            'passingTouchdowns': int(stats[-2]),
+            'interceptionsThrown': int(stats[-1])
+        }
+        # store the player passing stats in the game_data dictionary
+        game_data.get('playerAwayPassingStats').append(player_passing_stats)
+    
+    # Home team player passing stats will follow the away team player passing stats
+    passing_stats_lines = re.search(r'^Passing.*Passing(.*)^Defensive.*Defensive', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerHomePassingStats', [])
+    # iterate over each line in passing_stats_lines except for the first and last lines
+    for line in passing_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player passing stats
+        player_passing_stats = {
+            'playerName': ' '.join(stats[1:-5]),
+            'passCompletions': int(stats[-5]),
+            'passAttempts': int(stats[-4]),
+            'passingYards': int(stats[-3]),
+            'passingTouchdowns': int(stats[-2]),
+            'interceptionsThrown': int(stats[-1])
+        }
+        # store the player passing stats in the game_data dictionary
+        game_data.get('playerHomePassingStats').append(player_passing_stats)
+    
+    # "Defensive" format:
+    # {team year abbreviated} {player name} {sacks} {interceptions}
+    # get the lines from the first line that starts with "Defensive" to the next line that starts with "Defensive"
+    defensive_stats_lines = re.search(r'^Defensive$(.*)Defensive', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerAwayDefensiveStats', [])
+    # iterate over each line in defensive_stats_lines except for the first 2 lines and last line
+    for line in defensive_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player defensive stats
+        player_defensive_stats = {
+            'playerName': ' '.join(stats[1:-2]),
+            'sacks': int(stats[-2]),
+            'interceptions': int(stats[-1])
+        }
+        # store the player defensive stats in the game_data dictionary
+        game_data.get('playerAwayDefensiveStats').append(player_defensive_stats)
+    
+    # Home team player defensive stats will follow the away team player defensive stats
+    defensive_stats_lines = re.search(r'^Defensive.*Defensive(.*)^Field Goals.*Field Goals', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerHomeDefensiveStats', [])
+    # iterate over each line in defensive_stats_lines except for the first and last lines
+    for line in defensive_stats_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player defensive stats
+        player_defensive_stats = {
+            'playerName': ' '.join(stats[1:-2]),
+            'sacks': int(stats[-2]),
+            'interceptions': int(stats[-1])
+        }
+        # store the player defensive stats in the game_data dictionary
+        game_data.get('playerHomeDefensiveStats').append(player_defensive_stats)
 
     return game_data
 
