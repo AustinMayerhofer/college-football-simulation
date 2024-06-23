@@ -159,6 +159,45 @@ def read_teams_file():
 
 
 
+def parse_whatifsports_box_score(content):
+    # create a dictionary to store the box score data
+    game_data = {}
+
+    # first line has {away team year} {away team name} at {home team year} {home team name}, store the team names
+    # get first line of content
+    first_line = content.split('\n')[0]
+    # split the first line by ' at '
+    teams = first_line.split(' at ')
+    # store the away team year and name
+    away_team = teams[0].split(' ')
+    game_data['awayTeamYear'] = away_team[0]
+    game_data['awayTeamName'] = ' '.join(away_team[1:])
+    # store the home team year and name
+    home_team = teams[1].split(' ')
+    game_data['homeTeamYear'] = home_team[0]
+
+    # second line contains headers like "1st 2nd 3rd 4th" to indicate quarters. If there's an OT1, OT2, OT, or something along those lines, it means the game went to overtime
+    # get the line that starts with "Final -" and check if it contains "OT"
+    final_line = re.search(r'^Final -.*', content, re.MULTILINE)
+    if final_line and "OT" in final_line.group():
+        game_data['wasOvertime'] = True
+    else:
+        game_data['wasOvertime'] = False
+    
+    # The 3rd line is the quarter-by-quarter scoring for the away team. The last number in the line is their final score.
+    # get the line under the line that starts with "Final -" and get the last integer in the line
+    away_team_score_line = re.search(r'^Final -.*[\r\n]+([^\r\n]+)[\r\n]+([^\r\n]+)', content, re.MULTILINE).group(1)
+    game_data['awayTeamScore'] = int(away_team_score_line.split()[-1])
+
+    # The 4th line is the quarter-by-quarter scoring for the home team. The last number in the line is their final score.
+    # get the line under the line that starts with "Final -" and get the last integer in the line
+    home_team_score_line = re.search(r'^Final -.*[\r\n]+([^\r\n]+)[\r\n]+([^\r\n]+)', content, re.MULTILINE).group(2)
+    game_data['homeTeamScore'] = int(home_team_score_line.split()[-1])
+
+    return game_data
+
+
+
 def read_game_files():
     # Define columns for each dataframe
     games_columns = [
