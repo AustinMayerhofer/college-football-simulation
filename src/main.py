@@ -496,6 +496,54 @@ def parse_whatifsports_box_score(content):
         }
         # store the player defensive stats in the game_data dictionary
         game_data.get('playerHomeDefensiveStats').append(player_defensive_stats)
+    
+    # "Field Goals" will come up next, with the following format:
+    # {team year abbreviated} {player name} {field goals made} {field goals missed}
+    # The {field goals made} and {field goals missed} sections will be comma separated values of field goals made and missed, respectively. If no field goals were made and/or missed, a "-" will be there.
+    # get the lines from the first line that starts with "Field Goals" to the next line that starts with "Field Goals"
+    field_goals_lines = re.search(r'^Field Goals$(.*)Field Goals', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerAwayKickingStats', [])
+    # iterate over each line in field_goals_lines except for the first 2 lines and last line
+    for line in field_goals_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player kicking stats
+        player_kicking_stats = {
+            'playerName': ' '.join(stats[1:-2]),
+            'fieldGoalsMade': [] if stats[-2] == '-' else [int(x) for x in stats[-2].split(',')],
+            'fieldGoalsMissed': [] if stats[-1] == '-' else [int(x) for x in stats[-1].split(',')]
+        }
+        # store the player kicking stats in the game_data dictionary
+        game_data.get('playerAwayKickingStats').append(player_kicking_stats)
+    
+    # Home team player kicking stats will follow the away team player kicking stats
+    field_goals_lines = re.search(r'^Field Goals.*Field Goals(.*)^Player of the Game$', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    game_data.setdefault('playerHomeKickingStats', [])
+    # iterate over each line in field_goals_lines except for the first and last lines
+    for line in field_goals_lines.split('\n')[2:-1]:
+        # split the line by spaces
+        stats = line.split()
+        # store the player kicking stats
+        player_kicking_stats = {
+            'playerName': ' '.join(stats[1:-2]),
+            'fieldGoalsMade': [] if stats[-2] == '-' else [int(x) for x in stats[-2].split(',')],
+            'fieldGoalsMissed': [] if stats[-1] == '-' else [int(x) for x in stats[-1].split(',')]
+        }
+        # store the player kicking stats in the game_data dictionary
+        game_data.get('playerHomeKickingStats').append(player_kicking_stats)
+    
+    # Finally is the "Player of the Game" section, which will have the following format:
+    # {team year abbreviated} {player name} ({team year} {team})
+    # get the lines from the first line that starts with "Player of the Game" to the end of the content
+    player_of_the_game_lines = re.search(r'^Player of the Game$(.*)$', content, flags=re.DOTALL|re.MULTILINE).group(1)
+    # get the last line of player_of_the_game_lines
+    player_of_the_game_line = player_of_the_game_lines.split('\n')[-1]
+    # player of the game is what comes after '{integer} and before '('
+    player_of_the_game = ' '.join(player_of_the_game_line.split('(')[0].split()[1:])
+    game_data['playerOfTheGame'] = player_of_the_game
+    # player of the game team is what comes after '(' and before ')' without the year
+    player_of_the_game_team = ' '.join(player_of_the_game_line.split('(')[1].split(')')[0].split()[1:])
+    game_data['playerOfTheGameTeamName'] = player_of_the_game_team
 
     return game_data
 
