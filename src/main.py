@@ -194,6 +194,140 @@ def parse_whatifsports_box_score(content):
     home_team_score_line = re.search(r'^Final -.*[\r\n]+([^\r\n]+)[\r\n]+([^\r\n]+)', content, re.MULTILINE).group(2)
     game_data['homeTeamScore'] = int(home_team_score_line.split()[-1])
 
+    # Take the line that starts with "First Downs". The away team first downs is the following number, the home team first downs is the second number after that.
+    # get the line that starts with "First Downs" and get the 2 numbers after it
+    first_downs_line = re.search(r'^First Downs.*', content, re.MULTILINE)
+    first_downs = first_downs_line.group().split()
+    game_data['awayTeamTotalFirstDowns'] = int(first_downs[2])
+    game_data['homeTeamTotalFirstDowns'] = int(first_downs[3])
+
+    # The next line is " - Rushing" and this indicates the number of rushing first downs, again it goes away team then home team.
+    # get the line that starts with "- Rushing" and get the 2 numbers after it
+    rushing_first_downs_line = re.search(r'^- Rushing.*', content, re.MULTILINE)
+    rushing_first_downs = rushing_first_downs_line.group().split()
+    game_data['awayTeamRushingFirstDowns'] = int(rushing_first_downs[2])
+    game_data['homeTeamRushingFirstDowns'] = int(rushing_first_downs[3])
+
+    # After that is "- Passing" and it's the passing first downs, with the first number being away team and second being home team.
+    # get the line that starts with "- Passing" and get the 2 numbers after it
+    passing_first_downs_line = re.search(r'^- Passing.*', content, re.MULTILINE)
+    passing_first_downs = passing_first_downs_line.group().split()
+    game_data['awayTeamPassingFirstDowns'] = int(passing_first_downs[2])
+    game_data['homeTeamPassingFirstDowns'] = int(passing_first_downs[3])
+
+    # "- Penalty" follows the same logic.
+    # get the line that starts with "- Penalty" and get the 2 numbers after it
+    penalty_first_downs_line = re.search(r'^- Penalty.*', content, re.MULTILINE)
+    penalty_first_downs = penalty_first_downs_line.group().split()
+    game_data['awayTeamPenaltyFirstDowns'] = int(penalty_first_downs[2])
+    game_data['homeTeamPenaltyFirstDowns'] = int(penalty_first_downs[3])
+
+    # "3rd Down Eff" is formatted as {away 3rd down conversions}/{away 3rd down attempts} {home 3rd down conversions}/{home 3rd down attempts}
+    # get the line that starts with "3rd Down Eff" and get the 4 numbers after it
+    third_down_eff_line = re.search(r'^3rd Down Eff.*', content, re.MULTILINE)
+    third_down_eff = third_down_eff_line.group().split()
+    game_data['awayTeam3rdDownConversions'] = int(third_down_eff[3].split('/')[0])
+    game_data['awayTeam3rdDownAttempts'] = int(third_down_eff[3].split('/')[1])
+    game_data['homeTeam3rdDownConversions'] = int(third_down_eff[4].split('/')[0])
+    game_data['homeTeam3rdDownAttempts'] = int(third_down_eff[4].split('/')[1])
+
+    # "4th Down Eff" follows the same logic as 3rd Down Eff but for 4th downs.
+    # get the line that starts with "4th Down Eff" and get the 4 numbers after it
+    fourth_down_eff_line = re.search(r'^4th Down Eff.*', content, re.MULTILINE)
+    fourth_down_eff = fourth_down_eff_line.group().split()
+    game_data['awayTeam4thDownConversions'] = int(fourth_down_eff[3].split('/')[0])
+    game_data['awayTeam4thDownAttempts'] = int(fourth_down_eff[3].split('/')[1])
+    game_data['homeTeam4thDownConversions'] = int(fourth_down_eff[4].split('/')[0])
+    game_data['homeTeam4thDownAttempts'] = int(fourth_down_eff[4].split('/')[1])
+
+    # "Rushes-Yards" is formatted as {away carries}-{away rushing yards} {home carries}-{home rushing yards}
+    # get the line that starts with "Rushes-Yards" and get the 4 numbers after it
+    rushes_yards_line = re.search(r'^Rushes-Yards.*', content, re.MULTILINE)
+    rushes_yards = rushes_yards_line.group().split()
+    game_data['awayTeamCarries'] = int(rushes_yards[1].split('-')[0])
+    game_data['awayTeamRushingYards'] = int(rushes_yards[1].split('-')[1])
+    game_data['homeTeamCarries'] = int(rushes_yards[2].split('-')[0])
+    game_data['homeTeamRushingYards'] = int(rushes_yards[2].split('-')[1])
+
+    # "Comp-Att-Int" is formatted as {away completions}-{away pass attempts}-{away interceptions thrown} {home completions}-{home pass attempts}-{home interceptions thrown}
+    # get the line that starts with "Comp-Att-Int" and get the 6 numbers after it
+    comp_att_int_line = re.search(r'^Comp-Att-Int.*', content, re.MULTILINE)
+    comp_att_int = comp_att_int_line.group().split()
+    game_data['awayTeamCompletions'] = int(comp_att_int[1].split('-')[0])
+    game_data['awayTeamPassAttempts'] = int(comp_att_int[1].split('-')[1])
+    game_data['awayTeamInterceptionsThrown'] = int(comp_att_int[1].split('-')[2])
+    game_data['homeTeamCompletions'] = int(comp_att_int[2].split('-')[0])
+    game_data['homeTeamPassAttempts'] = int(comp_att_int[2].split('-')[1])
+    game_data['homeTeamInterceptionsThrown'] = int(comp_att_int[2].split('-')[2])
+
+    # "Passing Yards" is formatted as {away passing yards} {home passing yards}
+    # get the line that starts with "Passing Yards" and get the 2 numbers after it
+    passing_yards_line = re.search(r'^Passing Yards.*', content, re.MULTILINE)
+    passing_yards = passing_yards_line.group().split()
+    game_data['awayTeamPassingYards'] = int(passing_yards[2])
+    game_data['homeTeamPassingYards'] = int(passing_yards[3])
+
+    # "Sacks-Yards" is formatted as {away sacks allowed}-{away sacks allowed yardage} {home sacks allowed}-{home sacks allowed yardage}
+    # get the line that starts with "Sacks-Yards" and get the 4 numbers after it
+    sacks_yards_line = re.search(r'^Sacks-Yards.*', content, re.MULTILINE)
+    sacks_yards = sacks_yards_line.group().split()
+    game_data['awayTeamSacksAllowed'] = int(sacks_yards[1].split('-')[0])
+    game_data['awayTeamSacksAllowedYards'] = int(sacks_yards[1].split('-')[1])
+    game_data['homeTeamSacksAllowed'] = int(sacks_yards[2].split('-')[0])
+    game_data['homeTeamSacksAllowedYards'] = int(sacks_yards[2].split('-')[1])
+
+    # "Fumbles-Lost" is formatted as {away fumbles}-{away fumbles lost} {home fumbles}-{home fumbles lost}
+    # get the line that starts with "Fumbles-Lost" and get the 4 numbers after it
+    fumbles_lost_line = re.search(r'^Fumbles-Lost.*', content, re.MULTILINE)
+    fumbles_lost = fumbles_lost_line.group().split()
+    game_data['awayTeamFumbles'] = int(fumbles_lost[1].split('-')[0])
+    game_data['awayTeamFumblesLost'] = int(fumbles_lost[1].split('-')[1])
+    game_data['homeTeamFumbles'] = int(fumbles_lost[2].split('-')[0])
+    game_data['homeTeamFumblesLost'] = int(fumbles_lost[2].split('-')[1])
+
+    # "Punts-Avg" is formatted as {away punts}-{away punt average} {home punts}-{home punt average} and to get the away and home punt yardage, you can multiply the average by the number of punts, and round to the nearest integer.
+    # get the line that starts with "Punts-Avg" and get the 4 numbers after it
+    punts_avg_line = re.search(r'^Punts-Avg.*', content, re.MULTILINE)
+    punts_avg = punts_avg_line.group().split()
+    game_data['awayTeamPunts'] = int(punts_avg[1].split('-')[0])
+    game_data['awayTeamPuntYards'] = round(float(punts_avg[1].split('-')[1]) * game_data['awayTeamPunts'])
+    game_data['homeTeamPunts'] = int(punts_avg[2].split('-')[0])
+    game_data['homeTeamPuntYards'] = round(float(punts_avg[2].split('-')[1]) * game_data['homeTeamPunts'])
+
+    # "KR-Avg" is formatted as {away kick returns}-{away kick return yards} {home kick returns}-{home kick return yards} and like punts, we can multiply average by attempts to get the yardage.
+    # get the line that starts with "KR-Avg" and get the 4 numbers after it
+    kr_avg_line = re.search(r'^KR-Avg.*', content, re.MULTILINE)
+    kr_avg = kr_avg_line.group().split()
+    game_data['awayTeamKickReturns'] = int(kr_avg[1].split('-')[0])
+    game_data['awayTeamKickReturnYards'] = round(float(kr_avg[1].split('-')[1]) * game_data['awayTeamKickReturns'])
+    game_data['homeTeamKickReturns'] = int(kr_avg[2].split('-')[0])
+    game_data['homeTeamKickReturnYards'] = round(float(kr_avg[2].split('-')[1]) * game_data['homeTeamKickReturns'])
+
+    # "PR-Avg" follows the same logic as KR-Avg but for punt returns.
+    # get the line that starts with "PR-Avg" and get the 4 numbers after it
+    pr_avg_line = re.search(r'^PR-Avg.*', content, re.MULTILINE)
+    pr_avg = pr_avg_line.group().split()
+    game_data['awayTeamPuntReturns'] = int(pr_avg[1].split('-')[0])
+    game_data['awayTeamPuntReturnYards'] = round(float(pr_avg[1].split('-')[1]) * game_data['awayTeamPuntReturns'])
+    game_data['homeTeamPuntReturns'] = int(pr_avg[2].split('-')[0])
+    game_data['homeTeamPuntReturnYards'] = round(float(pr_avg[2].split('-')[1]) * game_data['homeTeamPuntReturns'])
+
+    # "Penalties-Yard" is formatted as {away penalties}-{away penalty yards} {home penalties}-{home penalty yards}
+    # get the line that starts with "Penalties-Yard" and get the 4 numbers after it
+    penalties_yard_line = re.search(r'^Penalties-Yard.*', content, re.MULTILINE)
+    penalties_yard = penalties_yard_line.group().split()
+    game_data['awayTeamPenalties'] = int(penalties_yard[1].split('-')[0])
+    game_data['awayTeamPenaltyYards'] = int(penalties_yard[1].split('-')[1])
+    game_data['homeTeamPenalties'] = int(penalties_yard[2].split('-')[0])
+    game_data['homeTeamPenaltyYards'] = int(penalties_yard[2].split('-')[1])
+
+    # "Time of Possession" is formatted as {away time of possession} {home time of possession}
+    # get the line that starts with "Time of Possession" and get the 2 numbers after it and store them as datetime objects
+    time_of_possession_line = re.search(r'^Time of Possession.*', content, re.MULTILINE)
+    time_of_possession = time_of_possession_line.group().split()
+    game_data['awayTimeOfPossession'] = datetime.strptime(time_of_possession[3], '%M:%S')
+    game_data['homeTimeOfPossession'] = datetime.strptime(time_of_possession[4], '%M:%S')
+
     return game_data
 
 
