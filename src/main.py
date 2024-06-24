@@ -173,7 +173,7 @@ def parse_whatifsports_box_score(content):
     if len(re.findall(r'^Defensive$', content, re.MULTILINE)) != 2:
         raise ValueError("Content does not contain 2 lines starting with 'Defensive'")
     if len(re.findall(r'^Field Goals$', content, re.MULTILINE)) != 2:
-        raise ValueError("Content does not contain 2 lines starting with 'Kicking'")
+        raise ValueError("Content does not contain 2 lines starting with 'Field Goals'")
 
     # first line has {away team year} {away team name} at {home team year} {home team name}, store the team names
     # get first line of content
@@ -549,7 +549,7 @@ def parse_whatifsports_box_score(content):
 
 
 
-def read_game_files():
+def read_game_files(TeamInfo):
     # Define columns for each dataframe
     games_columns = [
         'gameID', 'awayTeamName', 'homeTeamName', 'isNeutralSiteGame', 
@@ -665,10 +665,14 @@ def read_game_files():
                         away_team, home_team = None, None
                         if '@' in matchup:
                             away_team, home_team = re.split(r'\s+@\s+', matchup)
+                            isNeutralSiteGame = False
                         elif 'vs' in matchup:
                             away_team, home_team = re.split(r'\s+vs\s+', matchup)
+                            isNeutralSiteGame = True
                         if not away_team or not home_team:
                             raise ValueError(f"Invalid matchup format {matchup} in file {game_file_path}")
+                        if away_team not in TeamInfo['id'].values or home_team not in TeamInfo['id'].values:
+                            raise ValueError(f"Invalid team name in matchup {matchup} in file {game_file_path}")
 
                         # Validate significance
                         if significance not in accepted_significance:
@@ -689,86 +693,170 @@ def read_game_files():
                             raise ValueError(f"Invalid week value {week} in file {game_file_path}")
                         week_played = int(week) if week.isdigit() else 16
 
+                        # get what comes after "# Box Score" and before "# Game Description" without leading/trailing whitespace
+                        box_score = re.search(r'# Box Score(.*)# Game Description', content, flags=re.DOTALL).group(1).strip()
+                        # parse box score
+                        box_score_data = parse_whatifsports_box_score(box_score)
+
+                        # get what comes after "# Game Description" without leading/trailing whitespace
+                        game_description = re.search(r'# Game Description(.*)', content, flags=re.DOTALL).group(1).strip()
+
+
                         # Placeholder: Generate a unique game ID and determine other values
                         game_id = f"{away_team}_{home_team}_{game_date.strftime('%Y%m%d')}"
+                        if box_score_data['awayTeamScore'] > box_score_data['homeTeamScore']:
+                            winningTeamName = away_team
+                            losingTeamName = home_team
+                        elif box_score_data['awayTeamScore'] < box_score_data['homeTeamScore']:
+                            winningTeamName = home_team
+                            losingTeamName = away_team
+                        else:
+                            raise ValueError(f"Invalid box score data {box_score_data} in file {game_file_path}, away score {box_score_data['awayTeamScore']} and home score {box_score_data['homeTeamScore']} are equal.")
+                        
                         game_data = {
                             'gameID': game_id,
                             'awayTeamName': away_team,
                             'homeTeamName': home_team,
-                            'isNeutralSiteGame': False,  # Assume False for now
+                            'isNeutralSiteGame': isNeutralSiteGame,
                             'gameSignificance': significance,
                             'gameDate': game_date,
                             'weekPlayed': week_played,
-                            'winningTeamName': '',  # Determine from the box score
-                            'losingTeamName': '',  # Determine from the box score
-                            'awayTeamScore': 0,  # Extract from the box score
-                            'homeTeamScore': 0,  # Extract from the box score
-                            'wasOvertime': False,  # Determine from the box score
-                            'awayTeamTotalFirstDowns': 0,  # Extract from the box score
-                            'homeTeamTotalFirstDowns': 0,  # Extract from the box score
-                            'awayTeamRushingFirstDowns': 0,  # Extract from the box score
-                            'homeTeamRushingFirstDowns': 0,  # Extract from the box score
-                            'awayTeamPassingFirstDowns': 0,  # Extract from the box score
-                            'homeTeamPassingFirstDowns': 0,  # Extract from the box score
-                            'awayTeamPenaltyFirstDowns': 0,  # Extract from the box score
-                            'homeTeamPenaltyFirstDowns': 0,  # Extract from the box score
-                            'awayTeam3rdDownConversions': 0,  # Extract from the box score
-                            'homeTeam3rdDownConversions': 0,  # Extract from the box score
-                            'awayTeam3rdDownAttempts': 0,  # Extract from the box score
-                            'homeTeam3rdDownAttempts': 0,  # Extract from the box score
-                            'awayTeam4thDownConversions': 0,  # Extract from the box score
-                            'homeTeam4thDownConversions': 0,  # Extract from the box score
-                            'awayTeam4thDownAttempts': 0,  # Extract from the box score
-                            'homeTeam4thDownAttempts': 0,  # Extract from the box score
-                            'awayTeamCarries': 0,  # Extract from the box score
-                            'homeTeamCarries': 0,  # Extract from the box score
-                            'awayTeamRushingYards': 0,  # Extract from the box score
-                            'homeTeamRushingYards': 0,  # Extract from the box score
-                            'awayTeamCompletions': 0,  # Extract from the box score
-                            'homeTeamCompletions': 0,  # Extract from the box score
-                            'awayTeamPassAttempts': 0,  # Extract from the box score
-                            'homeTeamPassAttempts': 0,  # Extract from the box score
-                            'awayTeamInterceptionsThrown': 0,  # Extract from the box score
-                            'homeTeamInterceptionsThrown': 0,  # Extract from the box score
-                            'awayTeamPassingYards': 0,  # Extract from the box score
-                            'homeTeamPassingYards': 0,  # Extract from the box score
-                            'awayTeamSacksAllowed': 0,  # Extract from the box score
-                            'homeTeamSacksAllowed': 0,  # Extract from the box score
-                            'awayTeamSacksAllowedYards': 0,  # Extract from the box score
-                            'homeTeamSacksAllowedYards': 0,  # Extract from the box score
-                            'awayTeamFumbles': 0,  # Extract from the box score
-                            'homeTeamFumbles': 0,  # Extract from the box score
-                            'awayTeamFumblesLost': 0,  # Extract from the box score
-                            'homeTeamFumblesLost': 0,  # Extract from the box score
-                            'awayTeamPunts': 0,  # Extract from the box score
-                            'homeTeamPunts': 0,  # Extract from the box score
-                            'awayTeamPuntYards': 0,  # Extract from the box score
-                            'homeTeamPuntYards': 0,  # Extract from the box score
-                            'awayTeamKickReturns': 0,  # Extract from the box score
-                            'homeTeamKickReturns': 0,  # Extract from the box score
-                            'awayTeamKickReturnYards': 0,  # Extract from the box score
-                            'homeTeamKickReturnYards': 0,  # Extract from the box score
-                            'awayTeamPuntReturns': 0,  # Extract from the box score
-                            'homeTeamPuntReturns': 0,  # Extract from the box score
-                            'awayTeamPuntReturnYards': 0,  # Extract from the box score
-                            'homeTeamPuntReturnYards': 0,  # Extract from the box score
-                            'awayTeamPenalties': 0,  # Extract from the box score
-                            'homeTeamPenalties': 0,  # Extract from the box score
-                            'awayTeamPenaltyYards': 0,  # Extract from the box score
-                            'homeTeamPenaltyYards': 0,  # Extract from the box score
-                            'awayTimeOfPossession': '00:00',  # Extract from the box score
-                            'homeTimeOfPossession': '00:00',  # Extract from the box score
-                            'awayTeamKickReturnTouchdowns': 0,  # Extract from the box score
-                            'homeTeamKickReturnTouchdowns': 0,  # Extract from the box score
-                            'awayTeamPuntReturnTouchdowns': 0,  # Extract from the box score
-                            'homeTeamPuntReturnTouchdowns': 0,  # Extract from the box score
-                            'playerOfTheGame': '',  # Extract from the box score
-                            'playerOfTheGameTeamName': '',  # Extract from the box score
-                            'gameDescription': ''  # Extract from the game description
+                            'winningTeamName': winningTeamName,
+                            'losingTeamName': losingTeamName,
+                            'awayTeamScore': box_score_data['awayTeamScore'],
+                            'homeTeamScore': box_score_data['homeTeamScore'],
+                            'wasOvertime': box_score_data['wasOvertime'],
+                            'awayTeamTotalFirstDowns': box_score_data['awayTeamTotalFirstDowns'],
+                            'homeTeamTotalFirstDowns': box_score_data['homeTeamTotalFirstDowns'],
+                            'awayTeamRushingFirstDowns': box_score_data['awayTeamRushingFirstDowns'],
+                            'homeTeamRushingFirstDowns': box_score_data['homeTeamRushingFirstDowns'],
+                            'awayTeamPassingFirstDowns': box_score_data['awayTeamPassingFirstDowns'],
+                            'homeTeamPassingFirstDowns': box_score_data['homeTeamPassingFirstDowns'],
+                            'awayTeamPenaltyFirstDowns': box_score_data['awayTeamPenaltyFirstDowns'],
+                            'homeTeamPenaltyFirstDowns': box_score_data['homeTeamPenaltyFirstDowns'],
+                            'awayTeam3rdDownConversions': box_score_data['awayTeam3rdDownConversions'],
+                            'homeTeam3rdDownConversions': box_score_data['homeTeam3rdDownConversions'],
+                            'awayTeam3rdDownAttempts': box_score_data['awayTeam3rdDownAttempts'],
+                            'homeTeam3rdDownAttempts': box_score_data['homeTeam3rdDownAttempts'],
+                            'awayTeam4thDownConversions': box_score_data['awayTeam4thDownConversions'],
+                            'homeTeam4thDownConversions': box_score_data['homeTeam4thDownConversions'],
+                            'awayTeam4thDownAttempts': box_score_data['awayTeam4thDownAttempts'],
+                            'homeTeam4thDownAttempts': box_score_data['homeTeam4thDownAttempts'],
+                            'awayTeamCarries': box_score_data['awayTeamCarries'],
+                            'homeTeamCarries': box_score_data['homeTeamCarries'],
+                            'awayTeamRushingYards': box_score_data['awayTeamRushingYards'],
+                            'homeTeamRushingYards': box_score_data['homeTeamRushingYards'],
+                            'awayTeamCompletions': box_score_data['awayTeamCompletions'],
+                            'homeTeamCompletions': box_score_data['homeTeamCompletions'],
+                            'awayTeamPassAttempts': box_score_data['awayTeamPassAttempts'],
+                            'homeTeamPassAttempts': box_score_data['homeTeamPassAttempts'],
+                            'awayTeamInterceptionsThrown': box_score_data['awayTeamInterceptionsThrown'],
+                            'homeTeamInterceptionsThrown': box_score_data['homeTeamInterceptionsThrown'],
+                            'awayTeamPassingYards': box_score_data['awayTeamPassingYards'],
+                            'homeTeamPassingYards': box_score_data['homeTeamPassingYards'],
+                            'awayTeamSacksAllowed': box_score_data['awayTeamSacksAllowed'],
+                            'homeTeamSacksAllowed': box_score_data['homeTeamSacksAllowed'],
+                            'awayTeamSacksAllowedYards': box_score_data['awayTeamSacksAllowedYards'],
+                            'homeTeamSacksAllowedYards': box_score_data['homeTeamSacksAllowedYards'],
+                            'awayTeamFumbles': box_score_data['awayTeamFumbles'],
+                            'homeTeamFumbles': box_score_data['homeTeamFumbles'],
+                            'awayTeamFumblesLost': box_score_data['awayTeamFumblesLost'],
+                            'homeTeamFumblesLost': box_score_data['homeTeamFumblesLost'],
+                            'awayTeamPunts': box_score_data['awayTeamPunts'],
+                            'homeTeamPunts': box_score_data['homeTeamPunts'],
+                            'awayTeamPuntYards': box_score_data['awayTeamPuntYards'],
+                            'homeTeamPuntYards': box_score_data['homeTeamPuntYards'],
+                            'awayTeamKickReturns': box_score_data['awayTeamKickReturns'],
+                            'homeTeamKickReturns': box_score_data['homeTeamKickReturns'],
+                            'awayTeamKickReturnYards': box_score_data['awayTeamKickReturnYards'],
+                            'homeTeamKickReturnYards': box_score_data['homeTeamKickReturnYards'],
+                            'awayTeamPuntReturns': box_score_data['awayTeamPuntReturns'],
+                            'homeTeamPuntReturns': box_score_data['homeTeamPuntReturns'],
+                            'awayTeamPuntReturnYards': box_score_data['awayTeamPuntReturnYards'],
+                            'homeTeamPuntReturnYards': box_score_data['homeTeamPuntReturnYards'],
+                            'awayTeamPenalties': box_score_data['awayTeamPenalties'],
+                            'homeTeamPenalties': box_score_data['homeTeamPenalties'],
+                            'awayTeamPenaltyYards': box_score_data['awayTeamPenaltyYards'],
+                            'homeTeamPenaltyYards': box_score_data['homeTeamPenaltyYards'],
+                            'awayTimeOfPossession': box_score_data['awayTimeOfPossession'],
+                            'homeTimeOfPossession': box_score_data['homeTimeOfPossession'],
+                            'awayTeamKickReturnTouchdowns': 0,  # Placeholder
+                            'homeTeamKickReturnTouchdowns': 0,  # Placeholder
+                            'awayTeamPuntReturnTouchdowns': 0,  # Placeholder
+                            'homeTeamPuntReturnTouchdowns': 0,  # Placeholder
+                            'playerOfTheGame': box_score_data['playerOfTheGame'],
+                            'playerOfTheGameTeamName': box_score_data['playerOfTheGameTeamName'],
+                            'gameDescription': game_description
                         }
-
+                        
                         # Append data to the DataFrame
                         games_df = games_df.append(game_data, ignore_index=True)
+
+                        # get player rushing data by going through box_score_data['playerAwayRushingStats'] and box_score_data['playerHomeRushingStats']
+                        for player_rushing_stats in box_score_data['playerAwayRushingStats']:
+                            player_rushing_stats['gameID'] = game_id
+                            player_rushing_stats['teamName'] = away_team
+                            player_rushing_stats_df = player_rushing_stats_df.append(player_rushing_stats, ignore_index=True)
+                        for player_rushing_stats in box_score_data['playerHomeRushingStats']:
+                            player_rushing_stats['gameID'] = game_id
+                            player_rushing_stats['teamName'] = home_team
+                            player_rushing_stats_df = player_rushing_stats_df.append(player_rushing_stats, ignore_index=True)
+                        
+                        # get player receiving data by going through box_score_data['playerAwayReceivingStats'] and box_score_data['playerHomeReceivingStats']
+                        for player_receiving_stats in box_score_data['playerAwayReceivingStats']:
+                            player_receiving_stats['gameID'] = game_id
+                            player_receiving_stats['teamName'] = away_team
+                            player_receiving_stats_df = player_receiving_stats_df.append(player_receiving_stats, ignore_index=True)
+                        for player_receiving_stats in box_score_data['playerHomeReceivingStats']:
+                            player_receiving_stats['gameID'] = game_id
+                            player_receiving_stats['teamName'] = home_team
+                            player_receiving_stats_df = player_receiving_stats_df.append(player_receiving_stats, ignore_index=True)
+                        
+                        # get player passing data by going through box_score_data['playerAwayPassingStats'] and box_score_data['playerHomePassingStats']
+                        for player_passing_stats in box_score_data['playerAwayPassingStats']:
+                            player_passing_stats['gameID'] = game_id
+                            player_passing_stats['teamName'] = away_team
+                            player_passing_stats_df = player_passing_stats_df.append(player_passing_stats, ignore_index=True)
+                        for player_passing_stats in box_score_data['playerHomePassingStats']:
+                            player_passing_stats['gameID'] = game_id
+                            player_passing_stats['teamName'] = home_team
+                            player_passing_stats_df = player_passing_stats_df.append(player_passing_stats, ignore_index=True)
+                        
+                        # get player defensive data by going through box_score_data['playerAwayDefensiveStats'] and box_score_data['playerHomeDefensiveStats']
+                        for player_defensive_stats in box_score_data['playerAwayDefensiveStats']:
+                            player_defensive_stats['gameID'] = game_id
+                            player_defensive_stats['teamName'] = away_team
+                            player_defensive_stats_df = player_defensive_stats_df.append(player_defensive_stats, ignore_index=True)
+                        for player_defensive_stats in box_score_data['playerHomeDefensiveStats']:
+                            player_defensive_stats['gameID'] = game_id
+                            player_defensive_stats['teamName'] = home_team
+                            player_defensive_stats_df = player_defensive_stats_df.append(player_defensive_stats, ignore_index=True)
+                        
+                        # get player kicking data by going through box_score_data['playerAwayKickingStats'] and box_score_data['playerHomeKickingStats']
+                        for player_kicking_stats in box_score_data['playerAwayKickingStats']:
+                            player_kicking_stats['gameID'] = game_id
+                            player_kicking_stats['teamName'] = away_team
+                            player_kicking_stats_df = player_kicking_stats_df.append(player_kicking_stats, ignore_index=True)
+                        for player_kicking_stats in box_score_data['playerHomeKickingStats']:
+                            player_kicking_stats['gameID'] = game_id
+                            player_kicking_stats['teamName'] = home_team
+                            player_kicking_stats_df = player_kicking_stats_df.append(player_kicking_stats, ignore_index=True)
+                        
+                        # get player of the game data by going through box_score_data['playerOfTheGame']
+                        # check that box_score_data['playerOfTheGameTeamName'] is in TeamInfo['whatifsportsName']
+                        if box_score_data['playerOfTheGameTeamName'] not in TeamInfo['whatifsportsName'].values:
+                            raise ValueError(f"Invalid player of the game team name {box_score_data['playerOfTheGameTeamName']} in file {game_file_path}")
+                        # player_of_the_game_team_name is the id of the team in TeamInfo
+                        player_of_the_game_team_name = TeamInfo[TeamInfo['whatifsportsName'] == box_score_data['playerOfTheGameTeamName']]['id'].values[0]
+                        
+                        player_of_the_game_stats = {
+                            'gameID': game_id,
+                            'playerName': box_score_data['playerOfTheGame'],
+                            'teamName': player_of_the_game_team_name,
+                            'playerOfTheGameAwards': 1
+                        }
+                        player_of_the_game_stats_df = player_of_the_game_stats_df.append(player_of_the_game_stats, ignore_index=True)
+
 
     return (
         games_df, 
@@ -779,3 +867,9 @@ def read_game_files():
         player_kicking_stats_df, 
         player_of_the_game_stats_df
     )
+
+# main
+if __name__ == '__main__':
+    Conferences = read_conferences_file()
+    TeamInfo = read_teams_file()
+    Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGamePlayerOfTheGameStats = read_game_files(TeamInfo)
