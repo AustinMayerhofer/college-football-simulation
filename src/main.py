@@ -607,6 +607,12 @@ def read_game_files(TeamInfo):
         'gameID', 'playerName', 'teamName', 'fieldGoalsMade', 'fieldGoalsMissed'
     ]
 
+    player_returning_stats_columns = [
+        'gameID', 'playerName', 'teamName',
+        'kickReturns', 'kickReturnYards', 'kickReturnTouchdowns',
+        'puntReturns', 'puntReturnYards', 'puntReturnTouchdowns'
+    ]
+
     player_of_the_game_stats_columns = [
         'gameID', 'playerName', 'teamName', 'playerOfTheGameAwards'
     ]
@@ -618,6 +624,7 @@ def read_game_files(TeamInfo):
     player_passing_stats_df = pd.DataFrame(columns=player_passing_stats_columns)
     player_defensive_stats_df = pd.DataFrame(columns=player_defensive_stats_columns)
     player_kicking_stats_df = pd.DataFrame(columns=player_kicking_stats_columns)
+    player_returning_stats_df = pd.DataFrame(columns=player_returning_stats_columns)
     player_of_the_game_stats_df = pd.DataFrame(columns=player_of_the_game_stats_columns)
 
     # Define accepted values for validation
@@ -842,6 +849,96 @@ def read_game_files(TeamInfo):
                             player_kicking_stats['teamName'] = home_team
                             player_kicking_stats_df = player_kicking_stats_df.append(player_kicking_stats, ignore_index=True)
                         
+                        # get player returning data by going through box_score_data['playerAwayKickReturns'] and box_score_data['playerHomeKickReturns']
+                        # get player returning data by going through box_score_data['playerAwayPuntReturns'] and box_score_data['playerHomePuntReturns']
+                        # get away team kick returner and punt returner names from TeamInfo
+                        away_team_kick_returner = TeamInfo[TeamInfo['id'] == away_team]['kickReturnerName'].values[0]
+                        away_team_punt_returner = TeamInfo[TeamInfo['id'] == away_team]['puntReturnerName'].values[0]
+                        if away_team_kick_returner == away_team_punt_returner:
+                            # if the kick returner and punt returner are the same, only add one row
+                            player_returning_stats = {
+                                'gameID': game_id,
+                                'playerName': away_team_kick_returner,
+                                'teamName': away_team,
+                                'kickReturns': box_score_data['awayTeamKickReturns'],
+                                'kickReturnYards': box_score_data['awayTeamKickReturnYards'],
+                                'kickReturnTouchdowns': 0,
+                                'puntReturns': box_score_data['awayTeamPuntReturns'],
+                                'puntReturnYards': box_score_data['awayTeamPuntReturnYards'],
+                                'puntReturnTouchdowns': 0
+                            }
+                            player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
+                        else:
+                            # if the kick returner and punt returner are different, add two rows
+                            player_returning_stats = {
+                                'gameID': game_id,
+                                'playerName': away_team_kick_returner,
+                                'teamName': away_team,
+                                'kickReturns': box_score_data['awayTeamKickReturns'],
+                                'kickReturnYards': box_score_data['awayTeamKickReturnYards'],
+                                'kickReturnTouchdowns': 0,
+                                'puntReturns': 0,
+                                'puntReturnYards': 0,
+                                'puntReturnTouchdowns': 0
+                            }
+                            player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
+                            player_returning_stats = {
+                                'gameID': game_id,
+                                'playerName': away_team_punt_returner,
+                                'teamName': away_team,
+                                'kickReturns': 0,
+                                'kickReturnYards': 0,
+                                'kickReturnTouchdowns': 0,
+                                'puntReturns': box_score_data['awayTeamPuntReturns'],
+                                'puntReturnYards': box_score_data['awayTeamPuntReturnYards'],
+                                'puntReturnTouchdowns': 0
+                            }
+                            player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
+                        
+                        # get home team kick returner and punt returner names from TeamInfo
+                        home_team_kick_returner = TeamInfo[TeamInfo['id'] == home_team]['kickReturnerName'].values[0]
+                        home_team_punt_returner = TeamInfo[TeamInfo['id'] == home_team]['puntReturnerName'].values[0]
+                        if home_team_kick_returner == home_team_punt_returner:
+                            # if the kick returner and punt returner are the same, only add one row
+                            player_returning_stats = {
+                                'gameID': game_id,
+                                'playerName': home_team_kick_returner,
+                                'teamName': home_team,
+                                'kickReturns': box_score_data['homeTeamKickReturns'],
+                                'kickReturnYards': box_score_data['homeTeamKickReturnYards'],
+                                'kickReturnTouchdowns': 0,
+                                'puntReturns': box_score_data['homeTeamPuntReturns'],
+                                'puntReturnYards': box_score_data['homeTeamPuntReturnYards'],
+                                'puntReturnTouchdowns': 0
+                            }
+                            player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
+                        else:
+                            # if the kick returner and punt returner are different, add two rows
+                            player_returning_stats = {
+                                'gameID': game_id,
+                                'playerName': home_team_kick_returner,
+                                'teamName': home_team,
+                                'kickReturns': box_score_data['homeTeamKickReturns'],
+                                'kickReturnYards': box_score_data['homeTeamKickReturnYards'],
+                                'kickReturnTouchdowns': 0,
+                                'puntReturns': 0,
+                                'puntReturnYards': 0,
+                                'puntReturnTouchdowns': 0
+                            }
+                            player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
+                            player_returning_stats = {
+                                'gameID': game_id,
+                                'playerName': home_team_punt_returner,
+                                'teamName': home_team,
+                                'kickReturns': 0,
+                                'kickReturnYards': 0,
+                                'kickReturnTouchdowns': 0,
+                                'puntReturns': box_score_data['homeTeamPuntReturns'],
+                                'puntReturnYards': box_score_data['homeTeamPuntReturnYards'],
+                                'puntReturnTouchdowns': 0
+                            }
+                            player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
+                        
                         # get player of the game data by going through box_score_data['playerOfTheGame']
                         # check that box_score_data['playerOfTheGameTeamName'] is in TeamInfo['whatifsportsName']
                         if box_score_data['playerOfTheGameTeamName'] not in TeamInfo['whatifsportsName'].values:
@@ -865,6 +962,7 @@ def read_game_files(TeamInfo):
         player_passing_stats_df, 
         player_defensive_stats_df, 
         player_kicking_stats_df, 
+        player_returning_stats_df, 
         player_of_the_game_stats_df
     )
 
@@ -872,4 +970,4 @@ def read_game_files(TeamInfo):
 if __name__ == '__main__':
     Conferences = read_conferences_file()
     TeamInfo = read_teams_file()
-    Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGamePlayerOfTheGameStats = read_game_files(TeamInfo)
+    Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGameReturningStats, PlayerGamePlayerOfTheGameStats = read_game_files(TeamInfo)
