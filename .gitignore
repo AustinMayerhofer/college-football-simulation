@@ -1,2 +1,6 @@
 MessingAround/
 Templates/
+
+# temporary ranking output files
+Output/Temp/Ranking-Output.csv
+Output/Temp/Season-Scores-For-Ranking.csv

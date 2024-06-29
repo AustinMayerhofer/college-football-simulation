@@ -554,7 +554,7 @@ def read_game_files(TeamInfo):
     games_columns = [
         'gameID', 'awayTeamName', 'homeTeamName', 'isNeutralSiteGame', 
         'gameSignificance', 'gameDate', 'weekPlayed', 'winningTeamName', 
-        'losingTeamName', 'awayTeamScore', 'homeTeamScore', 'wasOvertime', 
+        'losingTeamName', 'awayTeamScore', 'homeTeamScore', 'winningTeamScore', 'losingTeamScore', 'wasOvertime', 
         'awayTeamTotalFirstDowns', 'homeTeamTotalFirstDowns', 
         'awayTeamRushingFirstDowns', 'homeTeamRushingFirstDowns', 
         'awayTeamPassingFirstDowns', 'homeTeamPassingFirstDowns', 
@@ -696,7 +696,7 @@ def read_game_files(TeamInfo):
                             raise ValueError(f"Invalid date format {date} in file {game_file_path}")
 
                         # Validate week
-                        if not (week.isdigit() and 1 <= int(week) <= 16) and week != 'bowl':
+                        if not (week.isdigit() and 1 <= int(week) <= 17):
                             raise ValueError(f"Invalid week value {week} in file {game_file_path}")
                         week_played = int(week) if week.isdigit() else 16
 
@@ -714,9 +714,13 @@ def read_game_files(TeamInfo):
                         if box_score_data['awayTeamScore'] > box_score_data['homeTeamScore']:
                             winningTeamName = away_team
                             losingTeamName = home_team
+                            winningTeamScore = box_score_data['awayTeamScore']
+                            losingTeamScore = box_score_data['homeTeamScore']
                         elif box_score_data['awayTeamScore'] < box_score_data['homeTeamScore']:
                             winningTeamName = home_team
                             losingTeamName = away_team
+                            winningTeamScore = box_score_data['homeTeamScore']
+                            losingTeamScore = box_score_data['awayTeamScore']
                         else:
                             raise ValueError(f"Invalid box score data {box_score_data} in file {game_file_path}, away score {box_score_data['awayTeamScore']} and home score {box_score_data['homeTeamScore']} are equal.")
                         
@@ -732,6 +736,8 @@ def read_game_files(TeamInfo):
                             'losingTeamName': losingTeamName,
                             'awayTeamScore': box_score_data['awayTeamScore'],
                             'homeTeamScore': box_score_data['homeTeamScore'],
+                            'winningTeamScore': winningTeamScore,
+                            'losingTeamScore': losingTeamScore,
                             'wasOvertime': box_score_data['wasOvertime'],
                             'awayTeamTotalFirstDowns': box_score_data['awayTeamTotalFirstDowns'],
                             'homeTeamTotalFirstDowns': box_score_data['homeTeamTotalFirstDowns'],
@@ -954,6 +960,9 @@ def read_game_files(TeamInfo):
                         }
                         player_of_the_game_stats_df = player_of_the_game_stats_df.append(player_of_the_game_stats, ignore_index=True)
 
+    # validate in games_df that winning team score > losing team score for every row
+    if not games_df[(games_df['winningTeamScore'] <= games_df['losingTeamScore'])].empty:
+        raise ValueError("Winning team score must be greater than losing team score for every row in games_df")
 
     return (
         games_df, 
@@ -965,6 +974,103 @@ def read_game_files(TeamInfo):
         player_returning_stats_df, 
         player_of_the_game_stats_df
     )
+
+def update_ranks_to_have_tied_ranks(rankings_output_df):
+    # Initialize variables to keep track of rank assignments
+    current_rank = 1
+    previous_points = None
+
+    # Update ranks based on ranking_points
+    new_ranks = []
+    for index, row in rankings_output_df.iterrows():
+        if row['ranking_points'] == previous_points:
+            new_ranks.append(current_rank)
+        else:
+            new_ranks.append(row['rank'])
+            current_rank = row['rank']
+            previous_points = row['ranking_points']
+
+    # Update the 'rank' column in the original DataFrame
+    rankings_output_df['rank'] = new_ranks
+
+    return rankings_output_df
+
+def create_rankings_df(TeamInfo, Games):
+    # Define columns for the rankings dataframe
+    rankings_columns = ['teamName', 'week1', 'week2', 'week3', 'week4', 'week5',
+                        'week6', 'week7', 'week8', 'week9', 'week10', 'week11', 'week12',
+                        'week13', 'week14', 'week15', 'week16', 'week17', 'final']
+    rankings_df = pd.DataFrame(columns=rankings_columns)
+
+    # add the team names to the rankings dataframe if their conference isn't FCS
+    for index, row in TeamInfo.iterrows():
+        if row['conferenceID'] != 'FCS':
+            rankings_df = rankings_df.append({'teamName': row['id']}, ignore_index=True)
+
+    # for week1 ranking, rank teams by their initialRankingPoints column in TeamInfo. Team with the highest initialRankingPoints is ranked 1
+    rankings_df['week1'] = rankings_df['teamName'].apply(lambda x: TeamInfo[TeamInfo['id'] == x]['initialRankingPoints'].values[0])
+    rankings_df['week1'] = rankings_df['week1'].rank(ascending=False)
+    # convert week1 column to int
+    rankings_df['week1'] = rankings_df['week1'].astype(int)
+
+    # Create a copy of the Games dataframe
+    Games_copy = Games.copy()
+    # Create the additional columns with empty values in the copy
+    Games_copy['empty1'] = ''
+    Games_copy['empty2'] = ''
+    Games_copy['empty3'] = ''
+    Games_copy['empty4'] = ''
+
+    # sort Games_copy by week
+    Games_copy = Games_copy.sort_values(by='weekPlayed')
+
+    # output games from Games dataframe into Output/Temp/Season-Scores-For-Ranking.csv
+    # in the form of {game id},{week},{date}},,,{winning team},{winning team points},,{losing team},{losing team points},
+    output_columns = [
+        'gameID', 'weekPlayed', 'gameDate', 'empty1', 'empty2', 'winningTeamName', 'winningTeamScore', 'empty3',
+        'losingTeamName', 'losingTeamScore', 'empty4'
+    ]
+    Games_copy.to_csv('Output/Temp/Season-Scores-For-Ranking.csv', columns=output_columns, index=False, header=False)
+
+    for week in range(2, 19):
+        # run the rankings program
+        os.system(f'./Output/Temp/ranker_program Output/Temp/Season-Teams-For-Ranking.csv Output/Temp/Season-Scores-For-Ranking.csv {week-1} > Output/Temp/Ranking-Output.csv')
+        # read the rankings output file into a dataframe
+        weeks_ranking_df = pd.read_csv('Output/Temp/Ranking-Output.csv')
+        if week >= 2 and week <= 5:
+            # if team has about the same ranking points as the team above them, they should be ranked the same
+            weeks_ranking_df = update_ranks_to_have_tied_ranks(weeks_ranking_df)
+        # rename 'name' to 'teamName'
+        weeks_ranking_df = weeks_ranking_df.rename(columns={'name': 'teamName'})
+        
+        # ranking logic
+        week_column = f'week{week}' if week < 18 else 'final'
+        rankings_df = pd.merge(rankings_df, weeks_ranking_df, on='teamName', how='outer')
+        if week == 2:
+            rankings_df[week_column] = rankings_df['week1'] * 0.8 + rankings_df['rank'] * 0.2
+            rankings_df[week_column] = rankings_df[week_column].rank(ascending=True)
+        elif week == 3:
+            rankings_df[week_column] = rankings_df['week1'] * 0.6 + rankings_df['rank'] * 0.4
+            rankings_df[week_column] = rankings_df[week_column].rank(ascending=True)
+        elif week == 4:
+            rankings_df[week_column] = rankings_df['week1'] * 0.4 + rankings_df['rank'] * 0.6
+            rankings_df[week_column] = rankings_df[week_column].rank(ascending=True)
+        elif week == 5:
+            rankings_df[week_column] = rankings_df['week1'] * 0.2 + rankings_df['rank'] * 0.8
+            rankings_df[week_column] = rankings_df[week_column].rank(ascending=True)
+        else:
+            rankings_df[week_column] = rankings_df['rank']
+        rankings_df = rankings_df.drop(columns=['rank', 'ranking_points'])
+
+        # convert week column to int
+        rankings_df[week_column] = rankings_df[week_column].astype(int)
+        # print(week)
+        # print(weeks_ranking_df)
+        # print(week)
+        # print(rankings_df)
+
+    return rankings_df
+
 
 # main
 if __name__ == '__main__':
