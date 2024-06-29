@@ -1077,3 +1077,4 @@ if __name__ == '__main__':
     Conferences = read_conferences_file()
     TeamInfo = read_teams_file()
     Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGameReturningStats, PlayerGamePlayerOfTheGameStats = read_game_files(TeamInfo)
+    Rankings = create_rankings_df(TeamInfo, Games)
