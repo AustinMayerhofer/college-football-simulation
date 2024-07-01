@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import re
 from datetime import datetime
+from datetime import timedelta
 
 def read_conferences_file():
     file_path = 'Meta/conferences.csv'
@@ -338,7 +339,11 @@ def parse_whatifsports_box_score(content):
     time_of_possession_line = re.search(r'^Time of Possession.*', content, re.MULTILINE)
     time_of_possession = time_of_possession_line.group().split()
     game_data['awayTimeOfPossession'] = datetime.strptime(time_of_possession[3], '%M:%S')
+    minutes, seconds = map(int, time_of_possession[3].split(':'))
+    game_data['awayTimeOfPossession'] = timedelta(minutes=minutes, seconds=seconds)
     game_data['homeTimeOfPossession'] = datetime.strptime(time_of_possession[4], '%M:%S')
+    minutes, seconds = map(int, time_of_possession[4].split(':'))
+    game_data['homeTimeOfPossession'] = timedelta(minutes=minutes, seconds=seconds)
 
     # The first subsection will be "Rushing" and the away team stats will come first. The next row is the " 	Att	Yds	20+	L	TD" and this is just the header telling you how to interpret the stats, we can ignore it. The next lines are formatted as follows:
     # {team year abbreviated} {player name} {rush attempts} {rush yards} {20 plus rush yard attempts} {longest rush} {rushing touchdowns}
@@ -814,7 +819,9 @@ def read_game_files(TeamInfo):
                             player_rushing_stats['gameID'] = game_id
                             player_rushing_stats['teamName'] = home_team
                             player_rushing_stats_df = player_rushing_stats_df.append(player_rushing_stats, ignore_index=True)
-                        
+                        # remove player from player_rushing_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_rushing_stats_df = player_rushing_stats_df[~player_rushing_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
+
                         # get player receiving data by going through box_score_data['playerAwayReceivingStats'] and box_score_data['playerHomeReceivingStats']
                         for player_receiving_stats in box_score_data['playerAwayReceivingStats']:
                             player_receiving_stats['gameID'] = game_id
@@ -824,6 +831,8 @@ def read_game_files(TeamInfo):
                             player_receiving_stats['gameID'] = game_id
                             player_receiving_stats['teamName'] = home_team
                             player_receiving_stats_df = player_receiving_stats_df.append(player_receiving_stats, ignore_index=True)
+                        # remove player from player_receiving_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_receiving_stats_df = player_receiving_stats_df[~player_receiving_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
                         
                         # get player passing data by going through box_score_data['playerAwayPassingStats'] and box_score_data['playerHomePassingStats']
                         for player_passing_stats in box_score_data['playerAwayPassingStats']:
@@ -834,6 +843,8 @@ def read_game_files(TeamInfo):
                             player_passing_stats['gameID'] = game_id
                             player_passing_stats['teamName'] = home_team
                             player_passing_stats_df = player_passing_stats_df.append(player_passing_stats, ignore_index=True)
+                        # remove player from player_passing_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_passing_stats_df = player_passing_stats_df[~player_passing_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
                         
                         # get player defensive data by going through box_score_data['playerAwayDefensiveStats'] and box_score_data['playerHomeDefensiveStats']
                         for player_defensive_stats in box_score_data['playerAwayDefensiveStats']:
@@ -844,6 +855,8 @@ def read_game_files(TeamInfo):
                             player_defensive_stats['gameID'] = game_id
                             player_defensive_stats['teamName'] = home_team
                             player_defensive_stats_df = player_defensive_stats_df.append(player_defensive_stats, ignore_index=True)
+                        # remove player from player_defensive_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_defensive_stats_df = player_defensive_stats_df[~player_defensive_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
                         
                         # get player kicking data by going through box_score_data['playerAwayKickingStats'] and box_score_data['playerHomeKickingStats']
                         for player_kicking_stats in box_score_data['playerAwayKickingStats']:
@@ -854,6 +867,8 @@ def read_game_files(TeamInfo):
                             player_kicking_stats['gameID'] = game_id
                             player_kicking_stats['teamName'] = home_team
                             player_kicking_stats_df = player_kicking_stats_df.append(player_kicking_stats, ignore_index=True)
+                        # remove player from player_kicking_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_kicking_stats_df = player_kicking_stats_df[~player_kicking_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
                         
                         # get player returning data by going through box_score_data['playerAwayKickReturns'] and box_score_data['playerHomeKickReturns']
                         # get player returning data by going through box_score_data['playerAwayPuntReturns'] and box_score_data['playerHomePuntReturns']
@@ -945,6 +960,9 @@ def read_game_files(TeamInfo):
                             }
                             player_returning_stats_df = player_returning_stats_df.append(player_returning_stats, ignore_index=True)
                         
+                        # remove player from player_returning_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_returning_stats_df = player_returning_stats_df[~player_returning_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
+
                         # get player of the game data by going through box_score_data['playerOfTheGame']
                         # check that box_score_data['playerOfTheGameTeamName'] is in TeamInfo['whatifsportsName']
                         if box_score_data['playerOfTheGameTeamName'] not in TeamInfo['whatifsportsName'].values:
@@ -959,6 +977,8 @@ def read_game_files(TeamInfo):
                             'playerOfTheGameAwards': 1
                         }
                         player_of_the_game_stats_df = player_of_the_game_stats_df.append(player_of_the_game_stats, ignore_index=True)
+                        # remove player from player_of_the_game_stats_df if player plays for an FCS team (conference is FCS in TeamInfo)
+                        player_of_the_game_stats_df = player_of_the_game_stats_df[~player_of_the_game_stats_df['teamName'].isin(TeamInfo[TeamInfo['conferenceID'] == 'FCS']['id'])]
 
     # validate in games_df that winning team score > losing team score for every row
     if not games_df[(games_df['winningTeamScore'] <= games_df['losingTeamScore'])].empty:
