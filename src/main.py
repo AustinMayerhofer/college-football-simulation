@@ -1091,6 +1091,577 @@ def create_rankings_df(TeamInfo, Games):
 
     return rankings_df
 
+def compile_season_stats(week, TeamInfo, Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGameReturningStats, PlayerGamePlayerOfTheGameStats):
+    TeamSeasonStats = pd.DataFrame(columns=['id', 'numGamesPlayed', 'numWins', 'numLosses', 'numConferenceWins',
+                                            'numConferenceLosses', 'numTotalFirstDowns', 'numRushingFirstDowns', 
+                                            'numPassingFirstDowns', 'numPenaltyFirstDowns', 'num3rdDownConversions', 
+                                            'num3rdDownAttempts', 'num4thDownConversions', 'num4thDownAttempts', 'numCarries', 
+                                            'numRushingYards', 'numCompletions', 'numPassAttempts', 
+                                            'numInterceptionsThrown', 'numPassingYards', 
+                                            'numSacksAllowed', 'numSacksAllowedYards', 'numFumbles', 'numFumblesLost', 
+                                            'numPunts', 'numPuntYards', 'numKickReturns', 'numKickReturnYards', 
+                                            'numKickReturnTouchdowns', 'numPuntReturns', 'numPuntReturnYards', 
+                                            'numPuntReturnTouchdowns', 'numPenalties', 'numPenaltyYards', 'totalTimeOfPossession', 
+                                            'numDefenseTotalFirstDownsAllowed', 'numDefenseRushingFirstDownsAllowed', 
+                                            'numDefensePassingFirstDownsAllowed', 'numDefensePenaltyFirstDownsAllowed', 
+                                            'numDefense3rdDownConversionsAllowed', 'numDefense3rdDownAttemptsAllowed', 
+                                            'numDefense4thDownConversionsAllowed', 'numDefense4thDownAttemptsAllowed', 
+                                            'numDefenseCarriesAllowed', 'numDefenseRushingYardsAllowed', 
+                                            'numDefenseCompletionsAllowed', 
+                                            'numDefensePassAttemptsAllowed',
+                                            'numDefenseInterceptions', 'numDefensePassingYardsAllowed', 'numDefenseSacks', 
+                                            'numDefenseSackYards', 'numDefenseFumblesForced', 'numDefenseFumblesRecovered', 
+                                            'numPuntsByOpponents', 'numPuntYardsByOpponents', 'numKickReturnsByOpponents', 
+                                            'numKickReturnYardsAllowed', 'numKickReturnTouchdownsAllowed', 
+                                            'numPuntReturnsByOpponents', 'numPuntReturnYardsAllowed', 'numPuntReturnTouchdownsAllowed'])
+    
+    PlayerSeasonRushingStats = pd.DataFrame(columns=['playerName', 'teamName', 'carries', 'rushingYards', '20PlusYardCarries', 
+                                                     'longestRush', 'rushingTouchdowns'])
+    
+    PlayerSeasonReceivingStats = pd.DataFrame(columns=['playerName', 'teamName', 'receptions', 'receivingYards', '20PlusYardReceptions', 
+                                                       '40PlusYardReceptions', 'longestReception', 'receivingTouchdowns'])
+
+    PlayerSeasonPassingStats = pd.DataFrame(columns=['playerName', 'teamName', 'passCompletions', 'passAttempts', 'passingYards', 
+                                                     'passingTouchdowns', 'interceptionsThrown'])
+    
+    PlayerSeasonDefensiveStats = pd.DataFrame(columns=['playerName', 'teamName', 'sacks', 'interceptions'])
+
+    PlayerSeasonKickingStats = pd.DataFrame(columns=['playerName', 'teamName', 'fieldGoalsMade', 'fieldGoalsMissed', 'fieldGoals0To29YardsMade', 'fieldGoals0To29YardsMissed',
+                                                     'fieldGoals30To39YardsMade', 'fieldGoals30To39YardsMissed', 'fieldGoals40To49YardsMade',
+                                                     'fieldGoals40To49YardsMissed', 'fieldGoals50PlusYardsMade', 'fieldGoals50PlusYardsMissed'])
+    
+    PlayerSeasonReturningStats = pd.DataFrame(columns=['playerName', 'teamName', 'kickReturns', 'kickReturnYards', 
+                                                       'kickReturnTouchdowns', 'puntReturns', 'puntReturnYards', 'puntReturnTouchdowns'])
+    
+    PlayerSeasonPlayerOfTheGameStats = pd.DataFrame(columns=['playerName', 'teamName', 'playerOfTheGameAwards'])
+
+    # isolate Games but only up to and including the week
+    Games = Games[Games['weekPlayed'] <= week]
+    
+    # add the team names to the TeamSeasonStats dataframe if their conference isn't FCS
+    TeamSeasonStats['id'] = TeamInfo[TeamInfo['conferenceID'] != 'FCS']['id']
+
+    # numGamesPlayed is the number of games the team has played
+    TeamSeasonStats['numGamesPlayed'] = TeamSeasonStats['id'].apply(lambda x: len(Games[(Games['awayTeamName'] == x) | (Games['homeTeamName'] == x)]))
+
+    # numWins is the number of games the team has won
+    TeamSeasonStats['numWins'] = TeamSeasonStats['id'].apply(lambda x: len(Games[(Games['winningTeamName'] == x)]))
+
+    # numLosses is the number of games the team has lost
+    TeamSeasonStats['numLosses'] = TeamSeasonStats['id'].apply(lambda x: len(Games[(Games['losingTeamName'] == x)]))
+
+    # check numWins + numLosses == numGamesPlayed
+    if not TeamSeasonStats[(TeamSeasonStats['numWins'] + TeamSeasonStats['numLosses'] != TeamSeasonStats['numGamesPlayed'])].empty:
+        raise ValueError("numWins + numLosses must equal numGamesPlayed for every row in TeamSeasonStats")
+    
+    # numConferenceWins is the number of conference games the team has won
+    TeamSeasonStats['numConferenceWins'] = TeamSeasonStats['id'].apply(lambda x: len(Games[(Games['winningTeamName'] == x) & (Games['gameSignificance'] == 'conference')]))
+
+    # numConferenceLosses is the number of conference games the team has lost
+    TeamSeasonStats['numConferenceLosses'] = TeamSeasonStats['id'].apply(lambda x: len(Games[(Games['losingTeamName'] == x) & (Games['gameSignificance'] == 'conference')]))
+
+    # numTotalFirstDowns is the total number of first downs the team has gained
+    # sum all the home first downs when the team is the home team
+    TeamSeasonStats['numTotalFirstDowns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamTotalFirstDowns'].sum())
+    # sum all the away first downs when the team is the away team
+    TeamSeasonStats['numTotalFirstDowns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamTotalFirstDowns'].sum())
+
+    # numRushingFirstDowns is the total number of rushing first downs the team has gained
+    # sum all the home rushing first downs when the team is the home team
+    TeamSeasonStats['numRushingFirstDowns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamRushingFirstDowns'].sum())
+    # sum all the away rushing first downs when the team is the away team
+    TeamSeasonStats['numRushingFirstDowns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamRushingFirstDowns'].sum())
+
+    # numPassingFirstDowns is the total number of passing first downs the team has gained
+    # sum all the home passing first downs when the team is the home team
+    TeamSeasonStats['numPassingFirstDowns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPassingFirstDowns'].sum())
+    # sum all the away passing first downs when the team is the away team
+    TeamSeasonStats['numPassingFirstDowns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPassingFirstDowns'].sum())
+
+    # numPenaltyFirstDowns is the total number of penalty first downs the team has gained
+    # sum all the home penalty first downs when the team is the home team
+    TeamSeasonStats['numPenaltyFirstDowns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPenaltyFirstDowns'].sum())
+    # sum all the away penalty first downs when the team is the away team
+    TeamSeasonStats['numPenaltyFirstDowns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPenaltyFirstDowns'].sum())
+
+    # num3rdDownConversions is the total number of 3rd down conversions the team has made
+    # sum all the home 3rd down conversions when the team is the home team
+    TeamSeasonStats['num3rdDownConversions'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeam3rdDownConversions'].sum())
+    # sum all the away 3rd down conversions when the team is the away team
+    TeamSeasonStats['num3rdDownConversions'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeam3rdDownConversions'].sum())
+
+    # num3rdDownAttempts is the total number of 3rd down attempts the team has made
+    # sum all the home 3rd down attempts when the team is the home team
+    TeamSeasonStats['num3rdDownAttempts'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeam3rdDownAttempts'].sum())
+    # sum all the away 3rd down attempts when the team is the away team
+    TeamSeasonStats['num3rdDownAttempts'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeam3rdDownAttempts'].sum())
+
+    # num4thDownConversions is the total number of 4th down conversions the team has made
+    # sum all the home 4th down conversions when the team is the home team
+    TeamSeasonStats['num4thDownConversions'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeam4thDownConversions'].sum())
+    # sum all the away 4th down conversions when the team is the away team
+    TeamSeasonStats['num4thDownConversions'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeam4thDownConversions'].sum())
+
+    # num4thDownAttempts is the total number of 4th down attempts the team has made
+    # sum all the home 4th down attempts when the team is the home team
+    TeamSeasonStats['num4thDownAttempts'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeam4thDownAttempts'].sum())
+    # sum all the away 4th down attempts when the team is the away team
+    TeamSeasonStats['num4thDownAttempts'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeam4thDownAttempts'].sum())
+
+    # numCarries is the total number of carries the team has made
+    # sum all the home carries when the team is the home team
+    TeamSeasonStats['numCarries'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamCarries'].sum())
+    # sum all the away carries when the team is the away team
+    TeamSeasonStats['numCarries'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamCarries'].sum())
+
+    # numRushingYards is the total number of rushing yards the team has gained
+    # sum all the home rushing yards when the team is the home team
+    TeamSeasonStats['numRushingYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamRushingYards'].sum())
+    # sum all the away rushing yards when the team is the away team
+    TeamSeasonStats['numRushingYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamRushingYards'].sum())
+
+    # numCompletions is the total number of completions the team has made
+    # sum all the home completions when the team is the home team
+    TeamSeasonStats['numCompletions'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamCompletions'].sum())
+    # sum all the away completions when the team is the away team
+    TeamSeasonStats['numCompletions'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamCompletions'].sum())
+
+    # numPassAttempts is the total number of pass attempts the team has made
+    # sum all the home pass attempts when the team is the home team
+    TeamSeasonStats['numPassAttempts'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPassAttempts'].sum())
+    # sum all the away pass attempts when the team is the away team
+    TeamSeasonStats['numPassAttempts'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPassAttempts'].sum())
+
+    # numInterceptionsThrown is the total number of interceptions the team has thrown
+    # sum all the home interceptions thrown when the team is the home team
+    TeamSeasonStats['numInterceptionsThrown'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamInterceptionsThrown'].sum())
+    # sum all the away interceptions thrown when the team is the away team
+    TeamSeasonStats['numInterceptionsThrown'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamInterceptionsThrown'].sum())
+
+    # numPassingYards is the total number of passing yards the team has gained
+    # sum all the home passing yards when the team is the home team
+    TeamSeasonStats['numPassingYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPassingYards'].sum())
+    # sum all the away passing yards when the team is the away team
+    TeamSeasonStats['numPassingYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPassingYards'].sum())
+
+    # numSacksAllowed is the total number of sacks the team has allowed
+    # sum all the home sacks allowed when the team is the home team
+    TeamSeasonStats['numSacksAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamSacksAllowed'].sum())
+    # sum all the away sacks allowed when the team is the away team
+    TeamSeasonStats['numSacksAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamSacksAllowed'].sum())
+
+    # numSacksAllowedYards is the total number of yards lost due to sacks the team has allowed
+    # sum all the home sack yards allowed when the team is the home team
+    TeamSeasonStats['numSacksAllowedYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamSacksAllowedYards'].sum())
+    # sum all the away sack yards allowed when the team is the away team
+    TeamSeasonStats['numSacksAllowedYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamSacksAllowedYards'].sum())
+
+    # numFumbles is the total number of fumbles the team has made
+    # sum all the home fumbles when the team is the home team
+    TeamSeasonStats['numFumbles'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamFumbles'].sum())
+    # sum all the away fumbles when the team is the away team
+    TeamSeasonStats['numFumbles'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamFumbles'].sum())
+
+    # numFumblesLost is the total number of fumbles the team has lost
+    # sum all the home fumbles lost when the team is the home team
+    TeamSeasonStats['numFumblesLost'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamFumblesLost'].sum())
+    # sum all the away fumbles lost when the team is the away team
+    TeamSeasonStats['numFumblesLost'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamFumblesLost'].sum())
+
+    # numPunts is the total number of punts the team has made
+    # sum all the home punts when the team is the home team
+    TeamSeasonStats['numPunts'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPunts'].sum())
+    # sum all the away punts when the team is the away team
+    TeamSeasonStats['numPunts'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPunts'].sum())
+
+    # numPuntYards is the total number of punt yards the team has made
+    # sum all the home punt yards when the team is the home team
+    TeamSeasonStats['numPuntYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPuntYards'].sum())
+    # sum all the away punt yards when the team is the away team
+    TeamSeasonStats['numPuntYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPuntYards'].sum())
+
+    # numKickReturns is the total number of kick returns the team has made
+    # sum all the home kick returns when the team is the home team
+    TeamSeasonStats['numKickReturns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamKickReturns'].sum())
+    # sum all the away kick returns when the team is the away team
+    TeamSeasonStats['numKickReturns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamKickReturns'].sum())
+
+    # numKickReturnYards is the total number of kick return yards the team has made
+    # sum all the home kick return yards when the team is the home team
+    TeamSeasonStats['numKickReturnYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamKickReturnYards'].sum())
+    # sum all the away kick return yards when the team is the away team
+    TeamSeasonStats['numKickReturnYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamKickReturnYards'].sum())
+
+    # numKickReturnTouchdowns is the total number of kick return touchdowns the team has made
+    # sum all the home kick return touchdowns when the team is the home team
+    TeamSeasonStats['numKickReturnTouchdowns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamKickReturnTouchdowns'].sum())
+    # sum all the away kick return touchdowns when the team is the away team
+    TeamSeasonStats['numKickReturnTouchdowns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamKickReturnTouchdowns'].sum())
+
+    # numPuntReturns is the total number of punt returns the team has made
+    # sum all the home punt returns when the team is the home team
+    TeamSeasonStats['numPuntReturns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPuntReturns'].sum())
+    # sum all the away punt returns when the team is the away team
+    TeamSeasonStats['numPuntReturns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPuntReturns'].sum())
+
+    # numPuntReturnYards is the total number of punt return yards the team has made
+    # sum all the home punt return yards when the team is the home team
+    TeamSeasonStats['numPuntReturnYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPuntReturnYards'].sum())
+    # sum all the away punt return yards when the team is the away team
+    TeamSeasonStats['numPuntReturnYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPuntReturnYards'].sum())
+
+    # numPuntReturnTouchdowns is the total number of punt return touchdowns the team has made
+    # sum all the home punt return touchdowns when the team is the home team
+    TeamSeasonStats['numPuntReturnTouchdowns'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPuntReturnTouchdowns'].sum())
+    # sum all the away punt return touchdowns when the team is the away team
+    TeamSeasonStats['numPuntReturnTouchdowns'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPuntReturnTouchdowns'].sum())
+
+    # numPenalties is the total number of penalties the team has made
+    # sum all the home penalties when the team is the home team
+    TeamSeasonStats['numPenalties'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPenalties'].sum())
+    # sum all the away penalties when the team is the away team
+    TeamSeasonStats['numPenalties'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPenalties'].sum())
+
+    # numPenaltyYards is the total number of penalty yards the team has made
+    # sum all the home penalty yards when the team is the home team
+    TeamSeasonStats['numPenaltyYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTeamPenaltyYards'].sum())
+    # sum all the away penalty yards when the team is the away team
+    TeamSeasonStats['numPenaltyYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTeamPenaltyYards'].sum())
+
+    # totalTimeOfPossession is the total time of possession the team has had
+    # sum all the home time of possession when the team is the home team
+    TeamSeasonStats['totalTimeOfPossession'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['homeTimeOfPossession'].sum())
+    # sum all the away time of possession when the team is the away team
+    TeamSeasonStats['totalTimeOfPossession'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['awayTimeOfPossession'].sum())
+
+    # numDefenseTotalFirstDownsAllowed is the total number of first downs the team has allowed
+    # sum all the away total first downs allowed when the team is the home team
+    TeamSeasonStats['numDefenseTotalFirstDownsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamTotalFirstDowns'].sum())
+    # sum all the home total first downs allowed when the team is the away team
+    TeamSeasonStats['numDefenseTotalFirstDownsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamTotalFirstDowns'].sum())
+
+    # numDefenseRushingFirstDownsAllowed is the total number of rushing first downs the team has allowed
+    # sum all the away rushing first downs allowed when the team is the home team
+    TeamSeasonStats['numDefenseRushingFirstDownsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamRushingFirstDowns'].sum())
+    # sum all the home rushing first downs allowed when the team is the away team
+    TeamSeasonStats['numDefenseRushingFirstDownsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamRushingFirstDowns'].sum())
+
+    # numDefensePassingFirstDownsAllowed is the total number of passing first downs the team has allowed
+    # sum all the away passing first downs allowed when the team is the home team
+    TeamSeasonStats['numDefensePassingFirstDownsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPassingFirstDowns'].sum())
+    # sum all the home passing first downs allowed when the team is the away team
+    TeamSeasonStats['numDefensePassingFirstDownsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPassingFirstDowns'].sum())
+
+    # numDefensePenaltyFirstDownsAllowed is the total number of penalty first downs the team has allowed
+    # sum all the away penalty first downs allowed when the team is the home team
+    TeamSeasonStats['numDefensePenaltyFirstDownsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPenaltyFirstDowns'].sum())
+    # sum all the home penalty first downs allowed when the team is the away team
+    TeamSeasonStats['numDefensePenaltyFirstDownsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPenaltyFirstDowns'].sum())
+
+    # numDefense3rdDownConversionsAllowed is the total number of 3rd down conversions the team has allowed
+    # sum all the away 3rd down conversions allowed when the team is the home team
+    TeamSeasonStats['numDefense3rdDownConversionsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeam3rdDownConversions'].sum())
+    # sum all the home 3rd down conversions allowed when the team is the away team
+    TeamSeasonStats['numDefense3rdDownConversionsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeam3rdDownConversions'].sum())
+
+    # numDefense3rdDownAttemptsAllowed is the total number of 3rd down attempts the team has allowed
+    # sum all the away 3rd down attempts allowed when the team is the home team
+    TeamSeasonStats['numDefense3rdDownAttemptsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeam3rdDownAttempts'].sum())
+    # sum all the home 3rd down attempts allowed when the team is the away team
+    TeamSeasonStats['numDefense3rdDownAttemptsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeam3rdDownAttempts'].sum())
+
+    # numDefense4thDownConversionsAllowed is the total number of 4th down conversions the team has allowed
+    # sum all the away 4th down conversions allowed when the team is the home team
+    TeamSeasonStats['numDefense4thDownConversionsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeam4thDownConversions'].sum())
+    # sum all the home 4th down conversions allowed when the team is the away team
+    TeamSeasonStats['numDefense4thDownConversionsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeam4thDownConversions'].sum())
+
+    # numDefense4thDownAttemptsAllowed is the total number of 4th down attempts the team has allowed
+    # sum all the away 4th down attempts allowed when the team is the home team
+    TeamSeasonStats['numDefense4thDownAttemptsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeam4thDownAttempts'].sum())
+    # sum all the home 4th down attempts allowed when the team is the away team
+    TeamSeasonStats['numDefense4thDownAttemptsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeam4thDownAttempts'].sum())
+
+    # numDefenseCarriesAllowed is the total number of carries the team has allowed
+    # sum all the away carries allowed when the team is the home team
+    TeamSeasonStats['numDefenseCarriesAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamCarries'].sum())
+    # sum all the home carries allowed when the team is the away team
+    TeamSeasonStats['numDefenseCarriesAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamCarries'].sum())
+
+    # numDefenseRushingYardsAllowed is the total number of rushing yards the team has allowed
+    # sum all the away rushing yards allowed when the team is the home team
+    TeamSeasonStats['numDefenseRushingYardsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamRushingYards'].sum())
+    # sum all the home rushing yards allowed when the team is the away team
+    TeamSeasonStats['numDefenseRushingYardsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamRushingYards'].sum())
+
+    # numDefenseCompletionsAllowed is the total number of completions the team has allowed
+    # sum all the away completions allowed when the team is the home team
+    TeamSeasonStats['numDefenseCompletionsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamCompletions'].sum())
+    # sum all the home completions allowed when the team is the away team
+    TeamSeasonStats['numDefenseCompletionsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamCompletions'].sum())
+
+    # numDefensePassAttemptsAllowed is the total number of pass attempts the team has allowed
+    # sum all the away pass attempts allowed when the team is the home team
+    TeamSeasonStats['numDefensePassAttemptsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPassAttempts'].sum())
+    # sum all the home pass attempts allowed when the team is the away team
+    TeamSeasonStats['numDefensePassAttemptsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPassAttempts'].sum())
+
+    # numDefenseInterceptions is the total number of interceptions the team has made
+    # sum all the away interceptions when the team is the home team
+    TeamSeasonStats['numDefenseInterceptions'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamInterceptionsThrown'].sum())
+    # sum all the home interceptions when the team is the away team
+    TeamSeasonStats['numDefenseInterceptions'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamInterceptionsThrown'].sum())
+
+    # numDefensePassingYardsAllowed is the total number of passing yards the team has allowed
+    # sum all the away passing yards allowed when the team is the home team
+    TeamSeasonStats['numDefensePassingYardsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPassingYards'].sum())
+    # sum all the home passing yards allowed when the team is the away team
+    TeamSeasonStats['numDefensePassingYardsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPassingYards'].sum())
+
+    # numDefenseSacks is the total number of sacks the team has made
+    # sum all the away sacks when the team is the home team
+    TeamSeasonStats['numDefenseSacks'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamSacksAllowed'].sum())
+    # sum all the home sacks when the team is the away team
+    TeamSeasonStats['numDefenseSacks'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamSacksAllowed'].sum())
+
+    # numDefenseSackYards is the total number of sack yards the team has made
+    # sum all the away sack yards when the team is the home team
+    TeamSeasonStats['numDefenseSackYards'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamSacksAllowedYards'].sum())
+    # sum all the home sack yards when the team is the away team
+    TeamSeasonStats['numDefenseSackYards'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamSacksAllowedYards'].sum())
+
+    # numDefenseFumblesForced is the total number of fumbles the team has forced
+    # sum all the away fumbles forced when the team is the home team
+    TeamSeasonStats['numDefenseFumblesForced'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamFumbles'].sum())
+    # sum all the home fumbles forced when the team is the away team
+    TeamSeasonStats['numDefenseFumblesForced'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamFumbles'].sum())
+
+    # numDefenseFumblesRecovered is the total number of fumbles the team has recovered
+    # sum all the away fumbles recovered when the team is the home team
+    TeamSeasonStats['numDefenseFumblesRecovered'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamFumblesLost'].sum())
+    # sum all the home fumbles recovered when the team is the away team
+    TeamSeasonStats['numDefenseFumblesRecovered'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamFumblesLost'].sum())
+
+    # numPuntsByOpponents is the total number of punts the team's opponents have made
+    # sum all the away punts when the team is the home team
+    TeamSeasonStats['numPuntsByOpponents'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPunts'].sum())
+    # sum all the home punts when the team is the away team
+    TeamSeasonStats['numPuntsByOpponents'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPunts'].sum())
+
+    # numPuntYardsByOpponents is the total number of punt yards the team's opponents have made
+    # sum all the away punt yards when the team is the home team
+    TeamSeasonStats['numPuntYardsByOpponents'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPuntYards'].sum())
+    # sum all the home punt yards when the team is the away team
+    TeamSeasonStats['numPuntYardsByOpponents'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPuntYards'].sum())
+
+    # numKickReturnsByOpponents is the total number of kick returns the team's opponents have made
+    # sum all the away kick returns when the team is the home team
+    TeamSeasonStats['numKickReturnsByOpponents'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamKickReturns'].sum())
+    # sum all the home kick returns when the team is the away team
+    TeamSeasonStats['numKickReturnsByOpponents'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamKickReturns'].sum())
+
+    # numKickReturnYardsAllowed is the total number of kick return yards the team's opponents have made
+    # sum all the away kick return yards when the team is the home team
+    TeamSeasonStats['numKickReturnYardsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamKickReturnYards'].sum())
+    # sum all the home kick return yards when the team is the away team
+    TeamSeasonStats['numKickReturnYardsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamKickReturnYards'].sum())
+
+    # numKickReturnTouchdownsAllowed is the total number of kick return touchdowns the team's opponents have made
+    # sum all the away kick return touchdowns when the team is the home team
+    TeamSeasonStats['numKickReturnTouchdownsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamKickReturnTouchdowns'].sum())
+    # sum all the home kick return touchdowns when the team is the away team
+    TeamSeasonStats['numKickReturnTouchdownsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamKickReturnTouchdowns'].sum())
+
+    # numPuntReturnsByOpponents is the total number of punt returns the team's opponents have made
+    # sum all the away punt returns when the team is the home team
+    TeamSeasonStats['numPuntReturnsByOpponents'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPuntReturns'].sum())
+    # sum all the home punt returns when the team is the away team
+    TeamSeasonStats['numPuntReturnsByOpponents'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPuntReturns'].sum())
+
+    # numPuntReturnYardsAllowed is the total number of punt return yards the team's opponents have made
+    # sum all the away punt return yards when the team is the home team
+    TeamSeasonStats['numPuntReturnYardsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPuntReturnYards'].sum())
+    # sum all the home punt return yards when the team is the away team
+    TeamSeasonStats['numPuntReturnYardsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPuntReturnYards'].sum())
+
+    # numPuntReturnTouchdownsAllowed is the total number of punt return touchdowns the team's opponents have made
+    # sum all the away punt return touchdowns when the team is the home team
+    TeamSeasonStats['numPuntReturnTouchdownsAllowed'] = TeamSeasonStats['id'].apply(lambda x: Games[Games['homeTeamName'] == x]['awayTeamPuntReturnTouchdowns'].sum())
+    # sum all the home punt return touchdowns when the team is the away team
+    TeamSeasonStats['numPuntReturnTouchdownsAllowed'] += TeamSeasonStats['id'].apply(lambda x: Games[Games['awayTeamName'] == x]['homeTeamPuntReturnTouchdowns'].sum())
+
+    # add the unique player names and team names combinations from PlayerGameRushingStats to the playerSeasonRushingStats dataframe
+    PlayerSeasonRushingStats = PlayerGameRushingStats[['playerName', 'teamName']].drop_duplicates()
+
+    # carries is the total number of carries the player has made
+    # sum all the carries the player/team combo has made
+    PlayerSeasonRushingStats['carries'] = PlayerSeasonRushingStats.apply(lambda x: PlayerGameRushingStats[(PlayerGameRushingStats['playerName'] == x['playerName']) & (PlayerGameRushingStats['teamName'] == x['teamName'])]['carries'].sum(), axis=1)
+
+    # rushingYards is the total number of rushing yards the player has gained
+    # sum all the rushing yards the player/team combo has gained
+    PlayerSeasonRushingStats['rushingYards'] = PlayerSeasonRushingStats.apply(lambda x: PlayerGameRushingStats[(PlayerGameRushingStats['playerName'] == x['playerName']) & (PlayerGameRushingStats['teamName'] == x['teamName'])]['rushingYards'].sum(), axis=1)
+
+    # 20PlusYardCarries is the total number of carries the player has made that have gained 20 or more yards
+    # sum all the 20+ yard carries the player/team combo has made
+    PlayerSeasonRushingStats['20PlusYardCarries'] = PlayerSeasonRushingStats.apply(lambda x: PlayerGameRushingStats[(PlayerGameRushingStats['playerName'] == x['playerName']) & (PlayerGameRushingStats['teamName'] == x['teamName'])]['20PlusYardCarries'].sum(), axis=1)
+
+    # longestRush is the longest rush the player has made
+    # find the longest rush the player/team combo has made
+    PlayerSeasonRushingStats['longestRush'] = PlayerSeasonRushingStats.apply(lambda x: PlayerGameRushingStats[(PlayerGameRushingStats['playerName'] == x['playerName']) & (PlayerGameRushingStats['teamName'] == x['teamName'])]['longestRush'].max(), axis=1)
+
+    # rushingTouchdowns is the total number of rushing touchdowns the player has made
+    # sum all the rushing touchdowns the player/team combo has made
+    PlayerSeasonRushingStats['rushingTouchdowns'] = PlayerSeasonRushingStats.apply(lambda x: PlayerGameRushingStats[(PlayerGameRushingStats['playerName'] == x['playerName']) & (PlayerGameRushingStats['teamName'] == x['teamName'])]['rushingTouchdowns'].sum(), axis=1)
+
+    # add the unique player names and team names combinations from PlayerGameReceivingStats to the playerSeasonReceivingStats dataframe
+    PlayerSeasonReceivingStats = PlayerGameReceivingStats[['playerName', 'teamName']].drop_duplicates()
+
+    # receptions is the total number of receptions the player has made
+    # sum all the receptions the player/team combo has made
+    PlayerSeasonReceivingStats['receptions'] = PlayerSeasonReceivingStats.apply(lambda x: PlayerGameReceivingStats[(PlayerGameReceivingStats['playerName'] == x['playerName']) & (PlayerGameReceivingStats['teamName'] == x['teamName'])]['receptions'].sum(), axis=1)
+
+    # receivingYards is the total number of receiving yards the player has gained
+    # sum all the receiving yards the player/team combo has gained
+    PlayerSeasonReceivingStats['receivingYards'] = PlayerSeasonReceivingStats.apply(lambda x: PlayerGameReceivingStats[(PlayerGameReceivingStats['playerName'] == x['playerName']) & (PlayerGameReceivingStats['teamName'] == x['teamName'])]['receivingYards'].sum(), axis=1)
+
+    # 20PlusYardReceptions is the total number of receptions the player has made that have gained 20 or more yards
+    # sum all the 20+ yard receptions the player/team combo has made
+    PlayerSeasonReceivingStats['20PlusYardReceptions'] = PlayerSeasonReceivingStats.apply(lambda x: PlayerGameReceivingStats[(PlayerGameReceivingStats['playerName'] == x['playerName']) & (PlayerGameReceivingStats['teamName'] == x['teamName'])]['20PlusYardReceptions'].sum(), axis=1)
+
+    # 40PlusYardReceptions is the total number of receptions the player has made that have gained 40 or more yards
+    # sum all the 40+ yard receptions the player/team combo has made
+    PlayerSeasonReceivingStats['40PlusYardReceptions'] = PlayerSeasonReceivingStats.apply(lambda x: PlayerGameReceivingStats[(PlayerGameReceivingStats['playerName'] == x['playerName']) & (PlayerGameReceivingStats['teamName'] == x['teamName'])]['40PlusYardReceptions'].sum(), axis=1)
+
+    # longestReception is the longest reception the player has made
+    # find the longest reception the player/team combo has made
+    PlayerSeasonReceivingStats['longestReception'] = PlayerSeasonReceivingStats.apply(lambda x: PlayerGameReceivingStats[(PlayerGameReceivingStats['playerName'] == x['playerName']) & (PlayerGameReceivingStats['teamName'] == x['teamName'])]['longestReception'].max(), axis=1)
+
+    # receivingTouchdowns is the total number of receiving touchdowns the player has made
+    # sum all the receiving touchdowns the player/team combo has made
+    PlayerSeasonReceivingStats['receivingTouchdowns'] = PlayerSeasonReceivingStats.apply(lambda x: PlayerGameReceivingStats[(PlayerGameReceivingStats['playerName'] == x['playerName']) & (PlayerGameReceivingStats['teamName'] == x['teamName'])]['receivingTouchdowns'].sum(), axis=1)
+
+    # add the unique player names and team names combinations from PlayerGamePassingStats to the playerSeasonPassingStats dataframe
+    PlayerSeasonPassingStats = PlayerGamePassingStats[['playerName', 'teamName']].drop_duplicates()
+
+    # passCompletions is the total number of completions the player has made
+    # sum all the completions the player/team combo has made
+    PlayerSeasonPassingStats['passCompletions'] = PlayerSeasonPassingStats.apply(lambda x: PlayerGamePassingStats[(PlayerGamePassingStats['playerName'] == x['playerName']) & (PlayerGamePassingStats['teamName'] == x['teamName'])]['passCompletions'].sum(), axis=1)
+
+    # passAttempts is the total number of pass attempts the player has made
+    # sum all the pass attempts the player/team combo has made
+    PlayerSeasonPassingStats['passAttempts'] = PlayerSeasonPassingStats.apply(lambda x: PlayerGamePassingStats[(PlayerGamePassingStats['playerName'] == x['playerName']) & (PlayerGamePassingStats['teamName'] == x['teamName'])]['passAttempts'].sum(), axis=1)
+
+    # passingYards is the total number of passing yards the player has gained
+    # sum all the passing yards the player/team combo has gained
+    PlayerSeasonPassingStats['passingYards'] = PlayerSeasonPassingStats.apply(lambda x: PlayerGamePassingStats[(PlayerGamePassingStats['playerName'] == x['playerName']) & (PlayerGamePassingStats['teamName'] == x['teamName'])]['passingYards'].sum(), axis=1)
+
+    # passingTouchdowns is the total number of passing touchdowns the player has made
+    # sum all the passing touchdowns the player/team combo has made
+    PlayerSeasonPassingStats['passingTouchdowns'] = PlayerSeasonPassingStats.apply(lambda x: PlayerGamePassingStats[(PlayerGamePassingStats['playerName'] == x['playerName']) & (PlayerGamePassingStats['teamName'] == x['teamName'])]['passingTouchdowns'].sum(), axis=1)
+
+    # interceptionsThrown is the total number of interceptions the player has thrown
+    # sum all the interceptions the player/team combo has thrown
+    PlayerSeasonPassingStats['interceptionsThrown'] = PlayerSeasonPassingStats.apply(lambda x: PlayerGamePassingStats[(PlayerGamePassingStats['playerName'] == x['playerName']) & (PlayerGamePassingStats['teamName'] == x['teamName'])]['interceptionsThrown'].sum(), axis=1)
+
+    # add the unique player names and team names combinations from PlayerGameDefensiveStats to the playerSeasonDefensiveStats dataframe
+    PlayerSeasonDefensiveStats = PlayerGameDefensiveStats[['playerName', 'teamName']].drop_duplicates()
+
+    # sacks is the total number of sacks the player has made
+    # sum all the sacks the player/team combo has made
+    PlayerSeasonDefensiveStats['sacks'] = PlayerSeasonDefensiveStats.apply(lambda x: PlayerGameDefensiveStats[(PlayerGameDefensiveStats['playerName'] == x['playerName']) & (PlayerGameDefensiveStats['teamName'] == x['teamName'])]['sacks'].sum(), axis=1)
+
+    # interceptions is the total number of interceptions the player has made
+    # sum all the interceptions the player/team combo has made
+    PlayerSeasonDefensiveStats['interceptions'] = PlayerSeasonDefensiveStats.apply(lambda x: PlayerGameDefensiveStats[(PlayerGameDefensiveStats['playerName'] == x['playerName']) & (PlayerGameDefensiveStats['teamName'] == x['teamName'])]['interceptions'].sum(), axis=1)
+
+    # add the unique player names and team names combinations from PlayerGameKickingStats to the playerSeasonKickingStats dataframe
+    PlayerSeasonKickingStats = PlayerGameKickingStats[['playerName', 'teamName']].drop_duplicates()
+
+    # fieldGoalsMade is the total number of field goals the player has made
+    # sum all the field goals the player/team combo has made, which is the number of elements in the fieldGoalsMade list
+    PlayerSeasonKickingStats['fieldGoalsMade'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMade'].apply(lambda x: len(x)).sum(), axis=1)
+
+    # fieldGoalsMissed is the total number of field goals the player has missed
+    # sum all the field goals the player/team combo has missed, which is the number of elements in the fieldGoalsMissed list
+    PlayerSeasonKickingStats['fieldGoalsMissed'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMissed'].apply(lambda x: len(x)).sum(), axis=1)
+
+    # fieldGoals0To29YardsMade is the total number of field goals the player has made from 0 to 29 yards
+    # sum all the field goals the player/team combo has made from 0 to 29 yards, which is the number of elements in the fieldGoalsMade list that are between 0 and 29
+    PlayerSeasonKickingStats['fieldGoals0To29YardsMade'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMade'].apply(lambda x: len([y for y in x if y <= 29])).sum(), axis=1)
+
+    # fieldGoals0To29YardsMissed is the total number of field goals the player has missed from 0 to 29 yards
+    # sum all the field goals the player/team combo has missed from 0 to 29 yards, which is the number of elements in the fieldGoalsMissed list that are between 0 and 29
+    PlayerSeasonKickingStats['fieldGoals0To29YardsMissed'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMissed'].apply(lambda x: len([y for y in x if y <= 29])).sum(), axis=1)
+
+    # fieldGoals30To39YardsMade is the total number of field goals the player has made from 30 to 39 yards
+    # sum all the field goals the player/team combo has made from 30 to 39 yards, which is the number of elements in the fieldGoalsMade list that are between 30 and 39
+    PlayerSeasonKickingStats['fieldGoals30To39YardsMade'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMade'].apply(lambda x: len([y for y in x if y >= 30 and y <= 39])).sum(), axis=1)
+
+    # fieldGoals30To39YardsMissed is the total number of field goals the player has missed from 30 to 39 yards
+    # sum all the field goals the player/team combo has missed from 30 to 39 yards, which is the number of elements in the fieldGoalsMissed list that are between 30 and 39
+    PlayerSeasonKickingStats['fieldGoals30To39YardsMissed'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMissed'].apply(lambda x: len([y for y in x if y >= 30 and y <= 39])).sum(), axis=1)
+
+    # fieldGoals40To49YardsMade is the total number of field goals the player has made from 40 to 49 yards
+    # sum all the field goals the player/team combo has made from 40 to 49 yards, which is the number of elements in the fieldGoalsMade list that are between 40 and 49
+    PlayerSeasonKickingStats['fieldGoals40To49YardsMade'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMade'].apply(lambda x: len([y for y in x if y >= 40 and y <= 49])).sum(), axis=1)
+
+    # fieldGoals40To49YardsMissed is the total number of field goals the player has missed from 40 to 49 yards
+    # sum all the field goals the player/team combo has missed from 40 to 49 yards, which is the number of elements in the fieldGoalsMissed list that are between 40 and 49
+    PlayerSeasonKickingStats['fieldGoals40To49YardsMissed'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMissed'].apply(lambda x: len([y for y in x if y >= 40 and y <= 49])).sum(), axis=1)
+
+    # fieldGoals50PlusYardsMade is the total number of field goals the player has made from 50+ yards
+    # sum all the field goals the player/team combo has made from 50+ yards, which is the number of elements in the fieldGoalsMade list that are 50 or more
+    PlayerSeasonKickingStats['fieldGoals50PlusYardsMade'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMade'].apply(lambda x: len([y for y in x if y >= 50])).sum(), axis=1)
+
+    # fieldGoals50PlusYardsMissed is the total number of field goals the player has missed from 50+ yards
+    # sum all the field goals the player/team combo has missed from 50+ yards, which is the number of elements in the fieldGoalsMissed list that are 50 or more
+    PlayerSeasonKickingStats['fieldGoals50PlusYardsMissed'] = PlayerSeasonKickingStats.apply(lambda x: PlayerGameKickingStats[(PlayerGameKickingStats['playerName'] == x['playerName']) & (PlayerGameKickingStats['teamName'] == x['teamName'])]['fieldGoalsMissed'].apply(lambda x: len([y for y in x if y >= 50])).sum(), axis=1)
+
+    # add the unique player names and team names combinations from PlayerGameReturningStats to the playerSeasonReturningStats dataframe
+    PlayerSeasonReturningStats = PlayerGameReturningStats[['playerName', 'teamName']].drop_duplicates()
+
+    # kickReturns is the total number of kick returns the player has made
+    # sum all the kick returns the player/team combo has made
+    PlayerSeasonReturningStats['kickReturns'] = PlayerSeasonReturningStats.apply(lambda x: PlayerGameReturningStats[(PlayerGameReturningStats['playerName'] == x['playerName']) & (PlayerGameReturningStats['teamName'] == x['teamName'])]['kickReturns'].sum(), axis=1)
+
+    # kickReturnYards is the total number of kick return yards the player has gained
+    # sum all the kick return yards the player/team combo has gained
+    PlayerSeasonReturningStats['kickReturnYards'] = PlayerSeasonReturningStats.apply(lambda x: PlayerGameReturningStats[(PlayerGameReturningStats['playerName'] == x['playerName']) & (PlayerGameReturningStats['teamName'] == x['teamName'])]['kickReturnYards'].sum(), axis=1)
+
+    # kickReturnTouchdowns is the total number of kick return touchdowns the player has made
+    # sum all the kick return touchdowns the player/team combo has made
+    PlayerSeasonReturningStats['kickReturnTouchdowns'] = PlayerSeasonReturningStats.apply(lambda x: PlayerGameReturningStats[(PlayerGameReturningStats['playerName'] == x['playerName']) & (PlayerGameReturningStats['teamName'] == x['teamName'])]['kickReturnTouchdowns'].sum(), axis=1)
+
+    # puntReturns is the total number of punt returns the player has made
+    # sum all the punt returns the player/team combo has made
+    PlayerSeasonReturningStats['puntReturns'] = PlayerSeasonReturningStats.apply(lambda x: PlayerGameReturningStats[(PlayerGameReturningStats['playerName'] == x['playerName']) & (PlayerGameReturningStats['teamName'] == x['teamName'])]['puntReturns'].sum(), axis=1)
+
+    # puntReturnYards is the total number of punt return yards the player has gained
+    # sum all the punt return yards the player/team combo has gained
+    PlayerSeasonReturningStats['puntReturnYards'] = PlayerSeasonReturningStats.apply(lambda x: PlayerGameReturningStats[(PlayerGameReturningStats['playerName'] == x['playerName']) & (PlayerGameReturningStats['teamName'] == x['teamName'])]['puntReturnYards'].sum(), axis=1)
+
+    # puntReturnTouchdowns is the total number of punt return touchdowns the player has made
+    # sum all the punt return touchdowns the player/team combo has made
+    PlayerSeasonReturningStats['puntReturnTouchdowns'] = PlayerSeasonReturningStats.apply(lambda x: PlayerGameReturningStats[(PlayerGameReturningStats['playerName'] == x['playerName']) & (PlayerGameReturningStats['teamName'] == x['teamName'])]['puntReturnTouchdowns'].sum(), axis=1)
+
+    # add the unique player names and team names combinations from PlayerGamePlayerOfTheGameStats to the playerSeasonPlayerOfTheGameStats dataframe
+    PlayerSeasonPlayerOfTheGameStats = PlayerGamePlayerOfTheGameStats[['playerName', 'teamName']].drop_duplicates()
+
+    # playerOfTheGameAwards is the total number of player of the game awards the player has won
+    # sum all the player of the game awards the player/team combo has won
+    PlayerSeasonPlayerOfTheGameStats['playerOfTheGameAwards'] = PlayerSeasonPlayerOfTheGameStats.apply(lambda x: PlayerGamePlayerOfTheGameStats[(PlayerGamePlayerOfTheGameStats['playerName'] == x['playerName']) & (PlayerGamePlayerOfTheGameStats['teamName'] == x['teamName'])]['playerOfTheGameAwards'].sum(), axis=1)
+
+    return (
+        TeamSeasonStats, 
+        PlayerSeasonRushingStats, 
+        PlayerSeasonReceivingStats, 
+        PlayerSeasonPassingStats, 
+        PlayerSeasonDefensiveStats, 
+        PlayerSeasonKickingStats, 
+        PlayerSeasonReturningStats, 
+        PlayerSeasonPlayerOfTheGameStats
+    )
+
 
 # main
 if __name__ == '__main__':
@@ -1098,3 +1669,4 @@ if __name__ == '__main__':
     TeamInfo = read_teams_file()
     Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGameReturningStats, PlayerGamePlayerOfTheGameStats = read_game_files(TeamInfo)
     Rankings = create_rankings_df(TeamInfo, Games)
+    TeamSeasonStats, PlayerSeasonRushingStats, PlayerSeasonReceivingStats, PlayerSeasonPassingStats, PlayerSeasonDefensiveStats, PlayerSeasonKickingStats, PlayerSeasonReturningStats, PlayerSeasonPlayerOfTheGameStats = compile_season_stats(1, TeamInfo, Games, PlayerGameRushingStats, PlayerGameReceivingStats, PlayerGamePassingStats, PlayerGameDefensiveStats, PlayerGameKickingStats, PlayerGameReturningStats, PlayerGamePlayerOfTheGameStats)
